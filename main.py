@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from os import path
 from time import sleep
+from zoneinfo import ZoneInfo
 
 from httpx import HTTPStatusError
 
@@ -29,11 +30,10 @@ display_info_lock = threading.Lock()
 
 
 def main():
-    threads = [threading.Thread(target=display_loop), threading.Thread(target=api_loop)]
-    [thread.start() for thread in threads]
-
-    # unreachable as threads are while True loops, but waiting for their completion keeps the program running
-    [thread.join() for thread in threads]
+    api_thread = threading.Thread(target=api_loop)
+    api_thread.start()
+    # run display loop in main thread
+    display_loop()
 
 
 def display_loop():
@@ -67,12 +67,20 @@ def display_loop():
 
                 for stopcode, display_info_model in display_info_dict.items():
                     # stop visits come in sorted by expected arrival time at stop, but this is not a guarantee of the
-                    # API docs so sort anyway to guarantee order
+                    # API docs so sort anyway to guarantee order, also remove any stop visits with missing expected arrival times
+                    filtered_stop_visit_list = [
+                        stop_visit
+                        for stop_visit in display_info_model.stop_visit_list
+                        if stop_visit.expected_arrival_time is not None
+                    ]
                     sorted_stop_visit_list = sorted(
-                        display_info_model.stop_visit_list,
+                        filtered_stop_visit_list,
                         key=lambda stop: stop.expected_arrival_time
-                        if stop.expected_arrival_time is not None
-                        else datetime.max,
+                        if stop.expected_arrival_time
+                        is not None  # guaranteed to not be None due to above filter, but handle to satisfy linter
+                        else datetime.max.replace(
+                            tzinfo=ZoneInfo("UTC")
+                        ),  # infinity time should not have a timezone, fuck you Guido van Rossum
                     )
 
                     # group by line reference, with each list ordered by expected arrival time
