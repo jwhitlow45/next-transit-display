@@ -208,6 +208,15 @@ BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIM
 ```
 NOTE: These are just default RGB color values I ripped from the internet. Some of them are pretty off on LED matrix displays. Feel free to modify any of them by going into `modules/display_utils.py` and tweaking the RGB values by hand, or adding your own color entries.
 
+#### FONT_X_ALIGNMENT
+```
+FONT_X_ALIGNMENT="CENTER"
+```
+Alignment of text in the X (left/right) direction, the following alignment options are valid:
+```
+CENTER LEFT
+```
+
 ### Development
 #### LOG_LEVEL
 ```

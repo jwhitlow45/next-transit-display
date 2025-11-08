@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from enum import StrEnum
 
 from modules.logger import logger
 
@@ -29,6 +30,11 @@ class Colors:
     MUNI_LESS = (150, 30, 0)
     MUNI_ALT = (100, 0, 180)
     MUNI_ALT_LESS = (60, 0, 140)
+
+
+class FontAlignment(StrEnum):
+    CENTER = "CENTER"
+    LEFT = "LEFT"
 
 
 def _calculate_absolute_time_difference_from_now(datetime_obj: datetime, tz_aware_now: datetime):
@@ -106,6 +112,12 @@ def get_text_center_y_pos(character_height: int, display_height: int):
     center_display_pixel = (display_height - 1) // 2  # bias up
     text_offset = character_height // 2  # bias up
     return center_display_pixel + text_offset
+
+
+def get_text_x_pos(text: str, character_width: int, display_width: int, text_alignment: FontAlignment):
+    return (
+        get_text_center_x_pos(text, character_width, display_width) if text_alignment == FontAlignment.CENTER else 2
+    )  # offset a couple pixels when left aligned so text isn't right at display edge
 
 
 def generate_display_line_row(

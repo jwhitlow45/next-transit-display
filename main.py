@@ -12,10 +12,12 @@ import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from modules.display_utils import (
     Colors,
+    FontAlignment,
     generate_display_line_row,
     get_status_led_colors,
     get_text_center_x_pos,
     get_text_center_y_pos,
+    get_text_x_pos,
 )
 from modules.logger import logger
 from modules.rgbmatrix_configurer import get_rgb_matrix
@@ -112,7 +114,9 @@ def display_loop():
                 for idx, display_line in enumerate(display_lines):
                     graphics_display_line_args.append(
                         (
-                            get_text_center_x_pos(display_line, 5, env.LED_MATRIX_COLS),
+                            get_text_x_pos(
+                                display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT)
+                            ),
                             1 + ((font.height) * (idx + 1)),
                             font_color,
                             display_line,
@@ -141,7 +145,7 @@ def display_loop():
                 )
             else:
                 loading_text = "Loading..."
-                text_x_pos = get_text_center_x_pos(loading_text, 5, env.LED_MATRIX_COLS)
+                text_x_pos = get_text_center_x_pos(loading_text, env.FONT_WIDTH, env.LED_MATRIX_COLS)
                 text_y_pos = get_text_center_y_pos(font.height, env.LED_MATRIX_ROWS)
 
                 canvas.Clear()

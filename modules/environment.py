@@ -52,4 +52,7 @@ for line_reference, stopcode, symbol in zip(
 
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
 FONT = os.getenv("FONT") or ""
+# FONT should be string of "<width>x<height>.bdf" so this gets font width for alignment
+FONT_WIDTH = int((FONT or "-1").split("x")[0])
 FONT_COLOR = os.getenv("FONT_COLOR") or ""
+FONT_ALIGNMENT = os.getenv("FONT_X_ALIGNMENT") or ""
