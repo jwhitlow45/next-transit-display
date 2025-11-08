@@ -68,18 +68,10 @@ def display_loop():
                 display_lines: list[str] = []
 
                 for stopcode, display_info_model in display_info_dict.items():
-                    # stop visits come in sorted by expected arrival time at stop, but this is not a guarantee of the
-                    # API docs so sort anyway to guarantee order, also remove any stop visits with missing expected arrival times
-                    filtered_stop_visit_list = [
-                        stop_visit
-                        for stop_visit in display_info_model.stop_visit_list
-                        if stop_visit.expected_arrival_time is not None
-                    ]
                     sorted_stop_visit_list = sorted(
-                        filtered_stop_visit_list,
+                        display_info_model.stop_visit_list,
                         key=lambda stop: stop.expected_arrival_time
-                        if stop.expected_arrival_time
-                        is not None  # guaranteed to not be None due to above filter, but handle to satisfy linter
+                        if stop.expected_arrival_time is not None
                         else datetime.max.replace(
                             tzinfo=ZoneInfo("UTC")
                         ),  # infinity time should not have a timezone, fuck you Guido van Rossum
@@ -88,7 +80,7 @@ def display_loop():
                     # group by line reference, with each list ordered by expected arrival time
                     line_reference_list_map: dict[str, list[StopVisitModel]] = defaultdict(list)
                     for stop_visit in sorted_stop_visit_list:
-                        # only display
+                        # only display if arriving in future
                         if (
                             stop_visit.expected_arrival_time is not None
                             and stop_visit.expected_arrival_time > now
