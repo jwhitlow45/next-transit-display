@@ -33,10 +33,11 @@ display_info_lock = threading.Lock()
 
 
 def main():
-    api_thread = threading.Thread(target=api_loop)
-    api_thread.start()
-    # run display loop in main thread
-    display_loop()
+    threads = [threading.Thread(target=display_loop), threading.Thread(target=api_loop)]
+    [thread.start() for thread in threads]
+
+    # will never end as threads are while True loops, but waiting for their completion keeps the program running
+    [thread.join() for thread in threads]
 
 
 def display_loop():
