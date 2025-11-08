@@ -185,6 +185,14 @@ Example output:
 ```
 
 ### Display info configuration
+#### LINE_REFERENCE_ORDER
+```
+LINE_REFERENCE_ORDER="LINE_REFERENCE"
+```
+Parameter which should be used to determine in which order line references should be displayed, the following parameter options are valid:
+```
+LINE_REFERENCE ARRIVAL_TIME
+```
 #### FUTURE_STOP_VISITS_SHOWN
 ```
 FUTURE_STOP_VISITS_SHOWN="2"

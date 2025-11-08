@@ -50,6 +50,7 @@ for line_reference, stopcode, symbol in zip(
 ):
     LINE_DISAMBIGUATION_SYMBOL_DICT[stopcode][line_reference] = symbol
 
+LINE_REFERENCE_ORDER = os.getenv("LINE_REFERENCE_ORDER") or ""
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
 FONT = os.getenv("FONT") or ""
 # FONT should be string of "<width>x<height>.bdf" so this gets font width for alignment

@@ -32,6 +32,11 @@ class Colors:
     MUNI_ALT_LESS = (60, 0, 140)
 
 
+class LineReferenceOrder(StrEnum):
+    LINE_REFERENCE = "LINE_REFERENCE"
+    ARRIVAL_TIME = "ARRIVAL_TIME"
+
+
 class FontAlignment(StrEnum):
     CENTER = "CENTER"
     LEFT = "LEFT"

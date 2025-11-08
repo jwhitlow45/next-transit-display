@@ -13,6 +13,7 @@ from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from modules.display_utils import (
     Colors,
     FontAlignment,
+    LineReferenceOrder,
     generate_display_line_row,
     get_status_led_colors,
     get_text_center_x_pos,
@@ -70,7 +71,11 @@ def display_loop():
                 for stopcode, display_info_model in display_info_dict.items():
                     sorted_stop_visit_list = sorted(
                         display_info_model.stop_visit_list,
-                        key=lambda stop: stop.expected_arrival_time
+                        key=lambda stop: (
+                            stop.expected_arrival_time
+                            if env.LINE_REFERENCE_ORDER == LineReferenceOrder.ARRIVAL_TIME
+                            else (stop.line_reference, stop.expected_arrival_time)
+                        )
                         if stop.expected_arrival_time is not None
                         else datetime.max.replace(
                             tzinfo=ZoneInfo("UTC")
