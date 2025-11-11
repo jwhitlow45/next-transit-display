@@ -65,7 +65,7 @@ def display_loop():
 
     while True:
         with display_info_lock:
-            if display_info_dict is not None:
+            if display_info_dict is not None and len(display_info_dict) > 0:
                 now = datetime.now(timezone.utc)
                 display_lines: list[str] = []
 
