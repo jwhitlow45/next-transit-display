@@ -202,12 +202,6 @@ def api_loop():
                 # catch all other errors as the OpenData511 API is fickle and I don't wanna play error whack-a-mole
                 logger.error("Unexpected exception while trying to fetch stop data...continuing", exc_info=True)
 
-        # api very rarely returns stopcodes with no stop visits even though the prior and future request will have
-        # stop visits, remove stopcode entry in these cases to prevent overwriting prior data with nothing
-        for stopcode in display_info_dict_staged:
-            if len(display_info_dict_staged[stopcode].stop_visit_list) == 0:
-                del display_info_dict_staged[stopcode]
-
         with display_info_lock:
             # NOTE: only want to overwrite stops for data we have fetched in case one of the API requests fails
             # This makes the display fault tolerant to occasional API request failures
