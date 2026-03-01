@@ -57,3 +57,5 @@ FONT = os.getenv("FONT") or ""
 FONT_WIDTH = int((FONT or "-1").split("x")[0])
 FONT_COLOR = os.getenv("FONT_COLOR") or ""
 FONT_ALIGNMENT = os.getenv("FONT_X_ALIGNMENT") or ""
+
+APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS = int(os.getenv("APPROXIMATE_AVERAGE_SUNSET_LENGTH") or 1800)

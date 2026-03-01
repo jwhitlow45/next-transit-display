@@ -225,6 +225,13 @@ Alignment of text in the X (left/right) direction, the following alignment optio
 CENTER LEFT
 ```
 
+### Time-based Brightness configuration
+#### APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS
+```
+APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS=1800
+```
+Number of seconds of the average sunset length in your area. This is used in combination with the day length from the SunriseSunset API to determine how slowly to dim the display as the sun rises and sets.
+
 ### Development
 #### LOG_LEVEL
 ```
