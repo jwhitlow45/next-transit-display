@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from enum import StrEnum
 
+from models.SunriseSunset import SunriseSunsetResult
 from modules.logger import logger
 
 
@@ -166,3 +167,39 @@ def generate_display_line_row(
     ).replace("0", "O")  # in the provided fonts the 0 is skinny and looks awful so use O instead
     logger.debug(f"display_line: {display_line}")
     return display_line
+
+
+def calculate_display_brightness(
+    sunrise_sunset_result: SunriseSunsetResult,
+    min_brightness: int,
+    max_brightness: int,
+):
+    """Calculates display brightness based on sunrise
+
+    Args:
+        sunrise_sunset_result (SunriseSunsetResult): SunriseSunsetResult object from SunriseSunset API
+        min_brightness (int): Minimum display brightness, expected value when there is no daylight
+        max_brightness (int): Maximum display brightness, expected value when there is full daylight
+    """
+    now = datetime.now().astimezone(timezone.utc)
+    if now < sunrise_sunset_result.nautical_twilight_begin or now > sunrise_sunset_result.nautical_twilight_end:
+        return min_brightness
+    elif (
+        now > sunrise_sunset_result.approximate_full_daylight_begin
+        and now < sunrise_sunset_result.approximate_full_daylight_end
+    ):
+        return max_brightness
+    elif now <= sunrise_sunset_result.approximate_full_daylight_begin:
+        brightness_diff = max_brightness - min_brightness
+        seconds_since_no_light = (now - sunrise_sunset_result.nautical_twilight_begin).seconds
+        timeframe_elapsed_percent = (
+            seconds_since_no_light / sunrise_sunset_result.no_light_to_full_daylight_timedelta.seconds
+        )
+        return int(min_brightness + (brightness_diff * timeframe_elapsed_percent))
+    else:  # now >= sunrise_sunset_result.approximate_full_daylight_end
+        brightness_diff = max_brightness - min_brightness
+        seconds_since_full_daylight = (now - sunrise_sunset_result.approximate_full_daylight_end).seconds
+        timeframe_elapsed_percent = (
+            seconds_since_full_daylight / sunrise_sunset_result.full_daylight_to_no_light_timedelta.seconds
+        )
+        return int(max_brightness - (brightness_diff * timeframe_elapsed_percent))
