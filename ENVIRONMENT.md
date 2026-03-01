@@ -226,11 +226,49 @@ CENTER LEFT
 ```
 
 ### Time-based Brightness configuration
+These environment variables are intended to be used to increase/decrease the brightness throughout the day as the sun rises and sets in your area. GPS coordinates are only ever sent to the [SunriseSunset API](https://sunrise-sunset.org/).
+
+During times in which full daylight is expected the display will have a brightness of `LED_MATRIX_MAX_BRIGHTNESS`. During times in which no daylight is expected the display will have a brightness of `LED_MATRIX_MIN_BRIGHTNESS`. The display's brightness will transition between these two values as the sun rises and sets.
+
+#### ENABLE_SUN_BASED_BRIGHTNESS
+```
+ENABLE_SUN_BASED_BRIGHTNESS="<0|1>"
+```
+Enables functionality to change brightness based on when the sun rises and sets. Requires all environment variables in this section to be configured.
+
+#### SUN_BASED_BRIGHTNESS_LAT
+```
+SUN_BASED_BRIGHTNESS_LAT="<latitude>"
+```
+Latitude for which to do sun-based brightness calculations
+
+#### SUN_BASED_BRIGHTNESS_LNG
+```
+SUN_BASED_BRIGHTNESS_LNG="<longitude>"
+```
+Longitude for which to do sun-based brightness calculations
+
+#### SUN_BASED_BRIGHTNESS_TZ
+```
+SUN_BASED_BRIGHTNESS_TZ="<iana-tz-string>
+```
+Timezone for which to do sun-based brightness calculations.
+
+You can find your IANA timezone string in the TZ Identifier column of this [Wikipedia page](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+
+Unfortunately the SunriseSunset API made a weird decision to have a timezone value that affects what "today" is in the API response. So in order to get the sun-related information for the current day in your timezone they have to be provided the timezone you live in as well. Otherwise if I provide a timezone of "UTC" it will give me sun-related information for the provided coordinates for the current date in UTC time.
+
 #### APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS
 ```
-APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS=1800
+APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS="<int>"
 ```
 Number of seconds of the average sunset length in your area. This is used in combination with the day length from the SunriseSunset API to determine how slowly to dim the display as the sun rises and sets.
+
+#### LED_MATRIX_MIN_BRIGHTNESS
+```
+LED_MATRIX_MIN_BRIGHTNESS="<int>"
+```
+Minimum brightness for time-based brightness configuration. This will be the brightness value the display trends towards as it gets darker. Once it is estimated to be fully dark based on the provided GPS coordinates this will be the brightness value used by the display. Defaults to `LED_MATRIX_MAX_BRIGHTNESS` if not set.
 
 ### Development
 #### LOG_LEVEL

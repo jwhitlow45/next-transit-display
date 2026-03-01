@@ -58,4 +58,31 @@ FONT_WIDTH = int((FONT or "-1").split("x")[0])
 FONT_COLOR = os.getenv("FONT_COLOR") or ""
 FONT_ALIGNMENT = os.getenv("FONT_X_ALIGNMENT") or ""
 
+ENABLE_SUN_BASED_BRIGHTNESS = int(os.getenv("ENABLE_SUN_BASED_BRIGHTNESS") or 0)
+SUN_BASED_BRIGHTNESS_LAT = float(os.getenv("SUN_BASED_BRIGHTNESS_LAT") or -1)
+SUN_BASED_BRIGHTNESS_LNG = float(os.getenv("SUN_BASED_BRIGHTNESS_LNG") or -1)
+SUN_BASED_BRIGHTNESS_TZ = os.getenv("SUN_BASED_BRIGHTNESS_TZ") or ""
 APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS = int(os.getenv("APPROXIMATE_AVERAGE_SUNSET_LENGTH") or 1800)
+LED_MATRIX_MIN_BRIGHTNESS = int(os.getenv("LED_MATRIX_MIN_BRIGHTNESS") or LED_MATRIX_MAX_BRIGHTNESS)
+
+if ENABLE_SUN_BASED_BRIGHTNESS == 1:
+    if os.getenv("SUN_BASED_BRIGHTNESS_LAT") is None:
+        raise ValueError(
+            "Environment variable SUN_BASED_BRIGHTNESS_LAT is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+        )
+    if os.getenv("SUN_BASED_BRIGHTNESS_LNG") is None:
+        raise ValueError(
+            "Environment variable SUN_BASED_BRIGHTNESS_LNG is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+        )
+    if os.getenv("SUN_BASED_BRIGHTNESS_TZ") is None:
+        raise ValueError(
+            "Environment variable SUN_BASED_BRIGHTNESS_TZ is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+        )
+    if os.getenv("APPROXIMATE_AVERAGE_SUNSET_LENGTH") is None:
+        raise ValueError(
+            "Environment variable APPROXIMATE_AVERAGE_SUNSET_LENGTH is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+        )
+    if os.getenv("LED_MATRIX_MIN_BRIGHTNESS") is None:
+        raise ValueError(
+            "Environment variable LED_MATRIX_MIN_BRIGHTNESS is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+        )
