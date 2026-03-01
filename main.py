@@ -10,10 +10,12 @@ from httpx import HTTPStatusError
 
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
+from models.SunriseSunset import SunriseSunsetResult
 from modules.display_utils import (
     Colors,
     FontAlignment,
     LineReferenceOrder,
+    calculate_display_brightness,
     generate_display_line_row,
     get_status_led_colors,
     get_text_center_x_pos,
@@ -24,12 +26,16 @@ from modules.logger import logger
 from modules.rgbmatrix_configurer import get_rgb_matrix
 from modules.rgbmatrix_importer import get_rgb_matrix_imports
 from services.OpenData511 import OpenData511Client
+from services.SunriseSunset import SunriseSunsetClient
 
 RGBMatrix, _, graphics = get_rgb_matrix_imports()
 
 # define globally so it is available to both threads
 display_info_dict: dict[str, DisplayInfoModel] | None = None
 display_info_lock = threading.Lock()
+
+sunrise_sunset_result: SunriseSunsetResult | None = None
+sunrise_sunset_result_lock = threading.Lock()
 
 
 def main():
@@ -160,6 +166,18 @@ def display_loop():
                         loading_text,
                     )
 
+                # dynamically calculate display brightness if enabled and data is available
+                if env.ENABLE_SUN_BASED_BRIGHTNESS == 1 and sunrise_sunset_result is not None:
+                    with sunrise_sunset_result_lock:
+                        brightness = calculate_display_brightness(
+                            sunrise_sunset_result=sunrise_sunset_result,
+                            min_brightness=env.LED_MATRIX_MIN_BRIGHTNESS,
+                            max_brightness=env.LED_MATRIX_MAX_BRIGHTNESS,
+                        )
+                        logger.debug(f"display brightness: {brightness}")
+                        logger.debug(f"sunrise sunset result: {sunrise_sunset_result}")
+                    canvas.brightness = brightness
+
                 canvas = matrix.SwapOnVSync(
                     canvas
                 )  # draw canvas, set returned canvas as new canvas to prevent flickering
@@ -171,13 +189,17 @@ def display_loop():
 
 
 def api_loop():
-    global display_info_dict
+    global display_info_dict, sunrise_sunset_result
 
     client_list = [OpenData511Client(env.OPEN_DATA_511_API_KEY_0)]
     if env.OPEN_DATA_511_API_KEY_1:
         client_list.append(OpenData511Client(env.OPEN_DATA_511_API_KEY_1))
 
     client_idx = 0
+
+    sunrise_sunset_client: SunriseSunsetClient | None = None
+    if env.ENABLE_SUN_BASED_BRIGHTNESS == 1:
+        sunrise_sunset_client = SunriseSunsetClient()
 
     while True:
         # utilizing a dict to isolate each stopcode so that request failures only impact the given requested stop
@@ -206,6 +228,28 @@ def api_loop():
             # NOTE: only want to overwrite stops for data we have fetched in case one of the API requests fails
             # This makes the display fault tolerant to occasional API request failures
             display_info_dict = (display_info_dict or {}) | display_info_dict_staged
+
+        if sunrise_sunset_client is not None:
+            now = datetime.now(ZoneInfo(env.SUN_BASED_BRIGHTNESS_TZ))
+            # if result is not set or the sunrise data is for another date, refresh the data
+            # in effect, the sunrise_sunset_result is only refreshed once per day to get data for that day
+            if sunrise_sunset_result is None or sunrise_sunset_result.sunrise.date() != now.date():
+                try:
+                    response = sunrise_sunset_client.get_solar_time_data(
+                        lat=env.SUN_BASED_BRIGHTNESS_LAT,
+                        lng=env.SUN_BASED_BRIGHTNESS_LNG,
+                        tzid=env.SUN_BASED_BRIGHTNESS_TZ,
+                    )
+                    with sunrise_sunset_result_lock:
+                        sunrise_sunset_result = response.results
+                except HTTPStatusError as err:
+                    logger.error(
+                        f"API Request Failed for SunriseSunset API: {err.response.status_code} {err.response.text}\n{err.response.json()}"
+                    )
+                except Exception:
+                    logger.error(
+                        "Unexpected exception while trying to fetch sunrise sunset data...continuing", exc_info=True
+                    )
 
         # round-robin api requests across clients to spread api usage across api keys
         # this could be done smarter to avoid detection of single client using multiple api keys, but since opendata511
