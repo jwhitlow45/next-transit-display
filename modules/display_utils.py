@@ -149,8 +149,14 @@ def generate_display_line_row(
 
     for arrival_time in line_arrival_times:
         difference = _calculate_absolute_time_difference_from_now(arrival_time, now)
+        difference_int = difference.seconds // 60
+
+        # if time difference is 3 characters or more replace with sad face for padding (it's also funny)
+        if difference_int >= 100:
+            time_until_arrival_minutes_list.append(":(")
+            continue
         # round down to nearest minute
-        difference_str = str(difference.seconds // 60)
+        difference_str = str(difference_int)
         # prepend single digit arrival times with 0 for alignment consistency
         difference_str_padded = difference_str if len(difference_str) > 1 else "0" + difference_str
         time_until_arrival_minutes_list.append(difference_str_padded)
