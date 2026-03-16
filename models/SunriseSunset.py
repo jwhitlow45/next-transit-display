@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, computed_field
 
-from modules.environment import APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS
+from modules.environment import SUN_DAYLIGHT_OFFSET
 
 
 class SunriseSunsetResult(BaseModel):
@@ -21,7 +21,7 @@ class SunriseSunsetResult(BaseModel):
     @property
     def approximate_full_daylight_offset(self) -> timedelta:
         """Approximate offset after sunrise/before sunset when the beginning/end of full daylight is"""
-        return timedelta(seconds=int(APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS * self.day_length / 43200))
+        return timedelta(seconds=int(SUN_DAYLIGHT_OFFSET * self.day_length / 43200))
 
     @computed_field  # type: ignore[prop-decorator]
     @property

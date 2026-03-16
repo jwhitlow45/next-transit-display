@@ -258,11 +258,11 @@ You can find your IANA timezone string in the TZ Identifier column of this [Wiki
 
 Unfortunately the SunriseSunset API made a weird decision to have a timezone value that affects what "today" is in the API response. So in order to get the sun-related information for the current day in your timezone they have to be provided the timezone you live in as well. Otherwise if I provide a timezone of "UTC" it will give me sun-related information for the provided coordinates for the current date in UTC time.
 
-#### APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS
+#### SUN_DAYLIGHT_OFFSET
 ```
-APPROXIMATE_AVERAGE_SUNSET_LENGTH_SECONDS="<int>"
+SUN_DAYLIGHT_OFFSET="<int>"
 ```
-Number of seconds of the average sunset length in your area. This is used in combination with the day length from the SunriseSunset API to determine how slowly to dim the display as the sun rises and sets.
+Number of seconds after/before sunrise/sunset that full daylight starts/ends. This is used in combination with day length from the SunriseSunset API to adjust how quickly the display increases/decreases brightness. In most parts of the world this can be set to 0. If your display brightness is changing too quickly then increase this value, and if it is changing too slowly decrease it.
 
 #### LED_MATRIX_MIN_BRIGHTNESS
 ```
