@@ -173,7 +173,7 @@ Spaces (" ") can be used as a blank to keep stops which don't have disambiguatio
 Example configuration where stopcode B services line 2 and 3 with spacing:
 ```
 LINE_REFERENCES="1,2,1,3"
-LINE_STOPCODES="A,A,B,B"
+LINE_STOPCODES="A,B,B,B"
 LINE_DISAMBIGUATION_SYMBOLS="N, ,S, "
 ```
 Example output:
