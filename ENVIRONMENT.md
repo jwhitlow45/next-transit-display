@@ -10,16 +10,16 @@ Variables set to non-empty strings ("\<value\>") or that are pre-populated are r
 Variables set to empty strings ("") are optional
 
 ### OpenData511 variables
-#### OPEN_DATA_511_API_KEY_0/OPEN_DATA_511_API_KEY_1
+#### OPEN_DATA_511_API_KEY_\<NUM\>
 ```
 OPEN_DATA_511_API_KEY_0="<api-key>"
 OPEN_DATA_511_API_KEY_1=""
 ```
 Get an API key here - https://511.org/open-data/token
 
-OpenData511 is not responding to requests for rate limit increases, meaning if you want to monitor more than one stop per minute you must use an additional API key. Please use this responsibly and do not abuse their API.
+OpenData511 is not responding to requests for rate limit increases, meaning if you want to monitor more than one stop per minute you must use additional API keys. Please use this responsibly and do not abuse their API.
 
-Only `OPEN_DATA_511_API_KEY_0` is required, but `OPEN_DATA_511_API_KEY_1` can be provided to "double" the program's rate limit from 60 to 120 requests per hour.
+Only `OPEN_DATA_511_API_KEY_0` is required. Any number of additional keys can be provided as `OPEN_DATA_511_API_KEY_1`, `OPEN_DATA_511_API_KEY_2`, and so on, with each key adding another 60 requests per hour to the program's effective rate limit. Keys must be numbered consecutively starting from 0. Ingestion stops at the first missing (or empty) key, so any keys after a gap are ignored.
 
 #### OPEN_DATA_511_AGENCY_ID
 ```

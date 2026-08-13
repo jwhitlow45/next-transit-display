@@ -8,8 +8,14 @@ load_dotenv(".env")
 
 LOG_LEVEL = os.getenv("LOG_LEVEL") or ""
 
-OPEN_DATA_511_API_KEY_0 = os.getenv("OPEN_DATA_511_API_KEY_0") or ""
-OPEN_DATA_511_API_KEY_1 = os.getenv("OPEN_DATA_511_API_KEY_1") or ""
+# collect api keys defined as OPEN_DATA_511_API_KEY_<NUM> starting from 0, stopping at the first missing key
+OPEN_DATA_511_API_KEY_LIST: list[str] = []
+while api_key := os.getenv(f"OPEN_DATA_511_API_KEY_{len(OPEN_DATA_511_API_KEY_LIST)}"):
+    OPEN_DATA_511_API_KEY_LIST.append(api_key)
+if len(OPEN_DATA_511_API_KEY_LIST) == 0:
+    raise ValueError(
+        "Environment variable 'OPEN_DATA_511_API_KEY_0' must be set in .env file at project root"
+    )
 OPEN_DATA_511_AGENCY_ID = os.getenv("OPEN_DATA_511_AGENCY_ID") or ""
 _OPEN_DATA_511_STOPCODES = os.getenv("OPEN_DATA_511_STOPCODES") or ""
 

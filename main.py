@@ -191,9 +191,7 @@ def display_loop():
 def api_loop():
     global display_info_dict, sunrise_sunset_result
 
-    client_list = [OpenData511Client(env.OPEN_DATA_511_API_KEY_0)]
-    if env.OPEN_DATA_511_API_KEY_1:
-        client_list.append(OpenData511Client(env.OPEN_DATA_511_API_KEY_1))
+    client_list = [OpenData511Client(api_key) for api_key in env.OPEN_DATA_511_API_KEY_LIST]
 
     client_idx = 0
 
