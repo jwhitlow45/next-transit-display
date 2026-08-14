@@ -214,9 +214,11 @@ def api_loop():
                     .convert_to_display_info()
                 )
             except HTTPStatusError as err:
-                # fail program on 401
+                # fail program on 401; an unhandled raise would only kill this thread and leave the display
+                # running with stale data forever
                 if err.response.status_code == 401:
-                    raise err
+                    logger.error(f"API key rejected for stopcode {stopcode}: 401 {err.response.text}")
+                    os._exit(1)
                 logger.error(
                     f"API Request Failed for stopcode {stopcode}: {err.response.status_code} {err.response.text}\n{err.response.json()}"
                 )
