@@ -71,7 +71,8 @@ class StopMonitoringDeliveryModel(BaseModel):
     version: str
     ResponseTimestamp: datetime
     Status: bool
-    MonitoredStopVisit: List[MonitoredStopVisitModel]
+    # default to empty so responses with no upcoming visits (e.g. overnight) don't fail validation
+    MonitoredStopVisit: List[MonitoredStopVisitModel] = []
     # NOTE: Intentionally omitting MonitoredStopVisitCancellation, StopLineNotice, and StopLineNoticeCancellation for simplicity
 
 
