@@ -1,5 +1,6 @@
 # import env vars
 import os
+import re
 from collections import defaultdict
 
 from dotenv import load_dotenv
@@ -59,8 +60,14 @@ for line_reference, stopcode, symbol in zip(
 LINE_REFERENCE_ORDER = os.getenv("LINE_REFERENCE_ORDER") or ""
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
 FONT = os.getenv("FONT") or ""
-# FONT should be string of "<width>x<height>.bdf" so this gets font width for alignment
-FONT_WIDTH = int((FONT or "-1").split("x")[0])
+# FONT name should contain "<width>x<height>" (e.g. "5x7.bdf", "clR6x12.bdf") so this gets font width for alignment
+_FONT_DIMENSIONS_MATCH = re.search(r"(\d+)x(\d+)", FONT)
+if _FONT_DIMENSIONS_MATCH is None:
+    raise ValueError(
+        "Environment variable 'FONT' must be set to a font name containing '<width>x<height>' (e.g. '5x7.bdf'); "
+        f"got '{FONT}'"
+    )
+FONT_WIDTH = int(_FONT_DIMENSIONS_MATCH.group(1))
 FONT_COLOR = os.getenv("FONT_COLOR") or ""
 FONT_ALIGNMENT = os.getenv("FONT_X_ALIGNMENT") or ""
 
