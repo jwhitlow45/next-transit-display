@@ -78,9 +78,10 @@ def get_status_led_colors(update_datetime: datetime, refresh_interval_seconds: i
     """
     difference = _calculate_absolute_time_difference_from_now(update_datetime, datetime.now(timezone.utc))
 
-    if difference.seconds < refresh_interval_seconds * 2:
+    # total_seconds() rather than .seconds, which excludes days and would wrap back to GREEN after 24 hours
+    if difference.total_seconds() < refresh_interval_seconds * 2:
         return Colors.GREEN
-    if difference.seconds < refresh_interval_seconds * 4:
+    if difference.total_seconds() < refresh_interval_seconds * 4:
         return Colors.YELLOW
 
     return Colors.RED  # information is very out of date
@@ -150,7 +151,7 @@ def generate_display_line_row(
 
     for arrival_time in line_arrival_times:
         difference = _calculate_absolute_time_difference_from_now(arrival_time, now)
-        difference_int = difference.seconds // 60
+        difference_int = int(difference.total_seconds()) // 60
 
         # if time difference is 3 characters or more replace with sad face for padding (it's also funny)
         if difference_int >= 100:
