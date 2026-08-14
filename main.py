@@ -64,8 +64,6 @@ def stop_visit_sort_key(stop_visit: StopVisitModel):
 
 
 def display_loop():
-    global display_info_dict
-
     # use bottom-right corner of display for status LED
     status_led_xy = (env.LED_MATRIX_COLS - 1, env.LED_MATRIX_ROWS - 1)
 
@@ -88,105 +86,111 @@ def display_loop():
 
     while True:
         try:
+            # snapshot the dict reference so drawing doesn't block api_loop; safe because api_loop
+            # always replaces the dict rather than mutating it in place
             with display_info_lock:
-                if display_info_dict is not None and len(display_info_dict) > 0:
-                    now = datetime.now(timezone.utc)
-                    display_lines: list[str] = []
+                display_info_snapshot = display_info_dict
 
-                    for stopcode, display_info_model in display_info_dict.items():
-                        sorted_stop_visit_list = sorted(display_info_model.stop_visit_list, key=stop_visit_sort_key)
+            if display_info_snapshot is not None and len(display_info_snapshot) > 0:
+                now = datetime.now(timezone.utc)
+                display_lines: list[str] = []
 
-                        # group by line reference, with each list ordered by expected arrival time
-                        line_reference_list_map: dict[str, list[StopVisitModel]] = defaultdict(list)
-                        for stop_visit in sorted_stop_visit_list:
-                            # only display if arriving in future
-                            if (
-                                stop_visit.expected_arrival_time is not None
-                                and stop_visit.expected_arrival_time > now
-                                and len(line_reference_list_map[stop_visit.line_reference])
-                                < env.FUTURE_STOP_VISITS_SHOWN
-                            ):
-                                line_reference_list_map[stop_visit.line_reference].append(stop_visit)
+                for stopcode, display_info_model in display_info_snapshot.items():
+                    sorted_stop_visit_list = sorted(display_info_model.stop_visit_list, key=stop_visit_sort_key)
 
-                        for line_reference, stop_visit_list in line_reference_list_map.items():
-                            display_lines.append(
-                                generate_display_line_row(
-                                    line_reference,
-                                    env.LINE_DISAMBIGUATION_SYMBOL_DICT.get(stopcode, {}).get(line_reference, ""),
-                                    [
-                                        sv.expected_arrival_time
-                                        for sv in stop_visit_list
-                                        if sv.expected_arrival_time is not None
-                                    ],
-                                    now,
-                                )
-                            )
+                    # group by line reference, with each list ordered by expected arrival time
+                    line_reference_list_map: dict[str, list[StopVisitModel]] = defaultdict(list)
+                    for stop_visit in sorted_stop_visit_list:
+                        # only display if arriving in future
+                        if (
+                            stop_visit.expected_arrival_time is not None
+                            and stop_visit.expected_arrival_time > now
+                            and len(line_reference_list_map[stop_visit.line_reference])
+                            < env.FUTURE_STOP_VISITS_SHOWN
+                        ):
+                            line_reference_list_map[stop_visit.line_reference].append(stop_visit)
 
-                    graphics_display_line_args = []
-                    for idx, display_line in enumerate(display_lines):
-                        graphics_display_line_args.append(
-                            (
-                                get_text_x_pos(
-                                    display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT)
-                                ),
-                                1 + ((font.height) * (idx + 1)),
-                                font_color,
-                                display_line,
+                    for line_reference, stop_visit_list in line_reference_list_map.items():
+                        display_lines.append(
+                            generate_display_line_row(
+                                line_reference,
+                                env.LINE_DISAMBIGUATION_SYMBOL_DICT.get(stopcode, {}).get(line_reference, ""),
+                                [
+                                    sv.expected_arrival_time
+                                    for sv in stop_visit_list
+                                    if sv.expected_arrival_time is not None
+                                ],
+                                now,
                             )
                         )
 
-                    # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display
-                    # info is. Use oldest response timestamp to keep this simple
-                    oldest_response_timestamp = min(
-                        [display_info.response_timestamp for display_info in display_info_dict.values()]
-                    )
-                    logger.debug(f"oldest_response_timestamp: {oldest_response_timestamp}")
-                    logger.debug(display_info_dict)
-                    status_led_colors = get_status_led_colors(
-                        oldest_response_timestamp, env.REFRESH_API_INTERVAL_SECONDS
-                    )
-                    # do all drawing as close as possible to canvas clear to prevent flickering
-                    canvas.Clear()
-                    for idx, args in enumerate(graphics_display_line_args):
-                        graphics.DrawText(
-                            canvas,
-                            font,
-                            *args,
+                graphics_display_line_args = []
+                for idx, display_line in enumerate(display_lines):
+                    graphics_display_line_args.append(
+                        (
+                            get_text_x_pos(
+                                display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT)
+                            ),
+                            1 + ((font.height) * (idx + 1)),
+                            font_color,
+                            display_line,
                         )
-                    canvas.SetPixel(
-                        *status_led_xy,
-                        *status_led_colors,
                     )
-                else:
-                    loading_text = "Loading..."
-                    text_x_pos = get_text_center_x_pos(loading_text, env.FONT_WIDTH, env.LED_MATRIX_COLS)
-                    text_y_pos = get_text_center_y_pos(font.height, env.LED_MATRIX_ROWS)
 
-                    canvas.Clear()
+                # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display
+                # info is. Use oldest response timestamp to keep this simple
+                oldest_response_timestamp = min(
+                    [display_info.response_timestamp for display_info in display_info_snapshot.values()]
+                )
+                logger.debug(f"oldest_response_timestamp: {oldest_response_timestamp}")
+                logger.debug(display_info_snapshot)
+                status_led_colors = get_status_led_colors(
+                    oldest_response_timestamp, env.REFRESH_API_INTERVAL_SECONDS
+                )
+                # do all drawing as close as possible to canvas clear to prevent flickering
+                canvas.Clear()
+                for idx, args in enumerate(graphics_display_line_args):
                     graphics.DrawText(
                         canvas,
                         font,
-                        text_x_pos,
-                        text_y_pos,
-                        font_color,
-                        loading_text,
+                        *args,
                     )
+                canvas.SetPixel(
+                    *status_led_xy,
+                    *status_led_colors,
+                )
+            else:
+                loading_text = "Loading..."
+                text_x_pos = get_text_center_x_pos(loading_text, env.FONT_WIDTH, env.LED_MATRIX_COLS)
+                text_y_pos = get_text_center_y_pos(font.height, env.LED_MATRIX_ROWS)
 
-                # dynamically calculate display brightness if enabled and data is available
-                if env.ENABLE_SUN_BASED_BRIGHTNESS == 1 and sunrise_sunset_result is not None:
-                    with sunrise_sunset_result_lock:
-                        brightness = calculate_display_brightness(
-                            sunrise_sunset_result=sunrise_sunset_result,
-                            min_brightness=env.LED_MATRIX_MIN_BRIGHTNESS,
-                            max_brightness=env.LED_MATRIX_MAX_BRIGHTNESS,
-                        )
-                        logger.debug(f"display brightness: {brightness}")
-                        logger.debug(f"sunrise sunset result: {sunrise_sunset_result}")
+                canvas.Clear()
+                graphics.DrawText(
+                    canvas,
+                    font,
+                    text_x_pos,
+                    text_y_pos,
+                    font_color,
+                    loading_text,
+                )
+
+            # dynamically calculate display brightness if enabled and data is available
+            if env.ENABLE_SUN_BASED_BRIGHTNESS == 1:
+                with sunrise_sunset_result_lock:
+                    sunrise_sunset_snapshot = sunrise_sunset_result
+                if sunrise_sunset_snapshot is not None:
+                    brightness = calculate_display_brightness(
+                        sunrise_sunset_result=sunrise_sunset_snapshot,
+                        min_brightness=env.LED_MATRIX_MIN_BRIGHTNESS,
+                        max_brightness=env.LED_MATRIX_MAX_BRIGHTNESS,
+                    )
+                    logger.debug(f"display brightness: {brightness}")
+                    logger.debug(f"sunrise sunset result: {sunrise_sunset_snapshot}")
                     canvas.brightness = brightness
 
-                canvas = matrix.SwapOnVSync(
-                    canvas
-                )  # draw canvas, set returned canvas as new canvas to prevent flickering
+            canvas = matrix.SwapOnVSync(
+                canvas
+            )  # draw canvas, set returned canvas as new canvas to prevent flickering
 
             sleep(env.REFRESH_DISPLAY_INTERVAL_SECONDS)
         except Exception:
