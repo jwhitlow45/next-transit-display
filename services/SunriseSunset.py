@@ -36,7 +36,8 @@ class SunriseSunsetClient:
         json_payload: dict[str, Any] | None = None,
     ) -> httpx.Response:
         response = self._client.request(method, path, params=params, json=json_payload)
-        logger.debug(f"Response json: {response.json()}")
+        # log text, not .json(): non-JSON error bodies would raise here and mask the real status code
+        logger.debug(f"Response body: {response.text}")
         response.raise_for_status()
         return response
 

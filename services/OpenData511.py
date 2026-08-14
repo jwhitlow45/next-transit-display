@@ -37,7 +37,8 @@ class OpenData511Client:
         json_payload: dict[str, Any] | None = None,
     ) -> httpx.Response:
         response = self._client.request(method, path, params=params, json=json_payload)
-        logger.debug(f"Response json: {response.json()}")
+        # log text, not .json(): non-JSON error bodies would raise here and mask the real status code
+        logger.debug(f"Response body: {response.text}")
         if response.status_code == 401:
             raise httpx.HTTPStatusError(
                 "401 Unauthorized: OpenData511 api key is missing or invalid",
