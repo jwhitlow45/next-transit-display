@@ -39,7 +39,11 @@ sunrise_sunset_result_lock = threading.Lock()
 
 
 def main():
-    threads = [threading.Thread(target=display_loop), threading.Thread(target=api_loop)]
+    # daemon threads so the process can exit on Ctrl+C/SIGTERM instead of hanging on the while True loops
+    threads = [
+        threading.Thread(target=display_loop, daemon=True),
+        threading.Thread(target=api_loop, daemon=True),
+    ]
     [thread.start() for thread in threads]
 
     # will never end as threads are while True loops, but waiting for their completion keeps the program running
@@ -266,6 +270,8 @@ def api_loop():
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt:
+        pass  # daemon worker threads die with the process
     except Exception:
         logger.exception("Uncaught exception terminated program", exc_info=True)
         os._exit(1)
