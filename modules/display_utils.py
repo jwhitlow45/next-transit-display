@@ -131,7 +131,7 @@ def generate_display_line_row(
     line_reference: str,
     line_disambiguation_symbol: str,
     line_arrival_times: list[datetime],
-    now=datetime.now(timezone.utc),
+    now: datetime | None = None,
 ):
     """Formats a line reference, disambiguation symbol, and line arrival times into an inline string
 
@@ -144,6 +144,9 @@ def generate_display_line_row(
     Returns:
         str: Inline string representing a line and its arrival times
     """
+    if now is None:  # a datetime.now default arg would be frozen at import time
+        now = datetime.now(timezone.utc)
+
     logger.debug(f"line_reference: {line_reference}")
     logger.debug(f"line_disambiguation_symbol: {line_disambiguation_symbol}")
     logger.debug(f"line_arrival_times: {line_arrival_times}")
