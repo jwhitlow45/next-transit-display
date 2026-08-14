@@ -46,6 +46,19 @@ def main():
     [thread.join() for thread in threads]
 
 
+def stop_visit_sort_key(stop_visit: StopVisitModel):
+    arrival_time = (
+        stop_visit.expected_arrival_time
+        if stop_visit.expected_arrival_time is not None
+        # infinity time should not have a timezone, fuck you Guido van Rossum
+        else datetime.max.replace(tzinfo=ZoneInfo("UTC"))
+    )
+    # keys must have the same shape for every visit or sorted() raises TypeError on tuple-vs-datetime comparison
+    if env.LINE_REFERENCE_ORDER == LineReferenceOrder.ARRIVAL_TIME:
+        return ("", arrival_time)
+    return (stop_visit.line_reference, arrival_time)
+
+
 def display_loop():
     global display_info_dict
 
@@ -77,18 +90,7 @@ def display_loop():
                     display_lines: list[str] = []
 
                     for stopcode, display_info_model in display_info_dict.items():
-                        sorted_stop_visit_list = sorted(
-                            display_info_model.stop_visit_list,
-                            key=lambda stop: (
-                                stop.expected_arrival_time
-                                if env.LINE_REFERENCE_ORDER == LineReferenceOrder.ARRIVAL_TIME
-                                else (stop.line_reference, stop.expected_arrival_time)
-                            )
-                            if stop.expected_arrival_time is not None
-                            else datetime.max.replace(
-                                tzinfo=ZoneInfo("UTC")
-                            ),  # infinity time should not have a timezone, fuck you Guido van Rossum
-                        )
+                        sorted_stop_visit_list = sorted(display_info_model.stop_visit_list, key=stop_visit_sort_key)
 
                         # group by line reference, with each list ordered by expected arrival time
                         line_reference_list_map: dict[str, list[StopVisitModel]] = defaultdict(list)
