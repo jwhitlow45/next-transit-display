@@ -220,7 +220,7 @@ def api_loop():
                     logger.error(f"API key rejected for stopcode {stopcode}: 401 {err.response.text}")
                     os._exit(1)
                 logger.error(
-                    f"API Request Failed for stopcode {stopcode}: {err.response.status_code} {err.response.text}\n{err.response.json()}"
+                    f"API Request Failed for stopcode {stopcode}: {err.response.status_code} {err.response.text}"
                 )
             except Exception:
                 # catch all other errors as the OpenData511 API is fickle and I don't wanna play error whack-a-mole
@@ -246,7 +246,7 @@ def api_loop():
                         sunrise_sunset_result = response.results
                 except HTTPStatusError as err:
                     logger.error(
-                        f"API Request Failed for SunriseSunset API: {err.response.status_code} {err.response.text}\n{err.response.json()}"
+                        f"API Request Failed for SunriseSunset API: {err.response.status_code} {err.response.text}"
                     )
                 except Exception:
                     logger.error(
