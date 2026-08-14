@@ -124,6 +124,10 @@ def display_loop():
                             )
                         )
 
+                # cap rows to what fits on the panel, extra rows would draw off-screen
+                max_display_lines = (env.LED_MATRIX_ROWS - 1) // font.height
+                display_lines = display_lines[:max_display_lines]
+
                 graphics_display_line_args = []
                 for idx, display_line in enumerate(display_lines):
                     graphics_display_line_args.append(
