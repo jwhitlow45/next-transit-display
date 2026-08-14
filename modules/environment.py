@@ -38,10 +38,7 @@ _LINE_DISAMBIGUATION_SYMBOLS = os.getenv("LINE_DISAMBIGUATION_SYMBOLS") or ""
 # process env vars
 OPEN_DATA_511_STOPCODE_LIST = [stopcode for stopcode in _OPEN_DATA_511_STOPCODES.split(",") if stopcode]
 if len(OPEN_DATA_511_STOPCODE_LIST) == 0:
-    open_data_stop_code_env_var_name = f"{_OPEN_DATA_511_STOPCODES=}".split("=")[0]
-    raise ValueError(
-        f"Environment variable '{open_data_stop_code_env_var_name}' must be set in .env file at project root"
-    )
+    raise ValueError("Environment variable 'OPEN_DATA_511_STOPCODES' must be set in .env file at project root")
 
 _LINE_REFERENCE_LIST = _LINE_REFERENCES.split(",")
 _LINE_STOPCODE_LIST = _LINE_STOPCODES.split(",")
@@ -79,23 +76,20 @@ SUN_DAYLIGHT_OFFSET = int(os.getenv("SUN_DAYLIGHT_OFFSET") or 0)
 LED_MATRIX_MIN_BRIGHTNESS = int(os.getenv("LED_MATRIX_MIN_BRIGHTNESS") or LED_MATRIX_MAX_BRIGHTNESS)
 
 if ENABLE_SUN_BASED_BRIGHTNESS == 1:
+    # NOTE: SUN_DAYLIGHT_OFFSET is not checked here as it defaults to 0
     if os.getenv("SUN_BASED_BRIGHTNESS_LAT") is None:
         raise ValueError(
-            "Environment variable SUN_BASED_BRIGHTNESS_LAT is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+            "Environment variable SUN_BASED_BRIGHTNESS_LAT is required when ENABLE_SUN_BASED_BRIGHTNESS is 1"
         )
     if os.getenv("SUN_BASED_BRIGHTNESS_LNG") is None:
         raise ValueError(
-            "Environment variable SUN_BASED_BRIGHTNESS_LNG is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+            "Environment variable SUN_BASED_BRIGHTNESS_LNG is required when ENABLE_SUN_BASED_BRIGHTNESS is 1"
         )
     if os.getenv("SUN_BASED_BRIGHTNESS_TZ") is None:
         raise ValueError(
-            "Environment variable SUN_BASED_BRIGHTNESS_TZ is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
-        )
-    if os.getenv("SUN_DAYLIGHT_OFFSET") is None:
-        raise ValueError(
-            "Environment variable APPROXIMATE_AVERAGE_SUNSET_LENGTH is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+            "Environment variable SUN_BASED_BRIGHTNESS_TZ is required when ENABLE_SUN_BASED_BRIGHTNESS is 1"
         )
     if os.getenv("LED_MATRIX_MIN_BRIGHTNESS") is None:
         raise ValueError(
-            "Environment variable LED_MATRIX_MIN_BRIGHTNESS is required when ENABLED_SUN_BASED_BRIGHTNESS is 1"
+            "Environment variable LED_MATRIX_MIN_BRIGHTNESS is required when ENABLE_SUN_BASED_BRIGHTNESS is 1"
         )
