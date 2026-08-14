@@ -94,6 +94,8 @@ LINE_DISAMBIGUATION_SYMBOLS=""
 ```
 When multiple transit lines share the same reference but travel in different directions (or serve different stops), you can use these variables to assign unique symbols next to line references on your display.
 
+Lines configured here are also always shown on the display, even when they have no upcoming arrivals. In that case only the line reference and its symbol are displayed. Lines not configured here only appear when they have upcoming arrivals.
+
 #### LINE_REFERENCES
 Comma-separated list of line references that need disambiguation.
 

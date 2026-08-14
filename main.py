@@ -110,14 +110,26 @@ def display_loop():
                         ):
                             line_reference_list_map[stop_visit.line_reference].append(stop_visit)
 
-                    for line_reference, stop_visit_list in line_reference_list_map.items():
+                    # lines configured in LINE_REFERENCES/LINE_STOPCODES are always shown, even when they
+                    # currently have no upcoming arrivals
+                    for line_reference in env.LINE_DISAMBIGUATION_SYMBOL_DICT.get(stopcode, {}):
+                        if line_reference not in line_reference_list_map:
+                            line_reference_list_map[line_reference] = []
+
+                    # insertion order comes from the visit sort, which lines without arrivals aren't part of,
+                    # so re-sort for a deterministic row order (arrival time mode leaves them last instead)
+                    line_reference_row_order = list(line_reference_list_map)
+                    if env.LINE_REFERENCE_ORDER != LineReferenceOrder.ARRIVAL_TIME:
+                        line_reference_row_order.sort()
+
+                    for line_reference in line_reference_row_order:
                         display_lines.append(
                             generate_display_line_row(
                                 line_reference,
                                 env.LINE_DISAMBIGUATION_SYMBOL_DICT.get(stopcode, {}).get(line_reference, ""),
                                 [
                                     sv.expected_arrival_time
-                                    for sv in stop_visit_list
+                                    for sv in line_reference_list_map[line_reference]
                                     if sv.expected_arrival_time is not None
                                 ],
                                 now,

@@ -167,8 +167,10 @@ def generate_display_line_row(
         time_until_arrival_minutes_list.append(difference_str_padded)
 
     display_line = (
-        f"{line_reference}{line_disambiguation_symbol} " + " ".join(time_until_arrival_minutes_list)
-    ).replace("0", "O")  # in the provided fonts the 0 is skinny and looks awful so use O instead
+        (f"{line_reference}{line_disambiguation_symbol} " + " ".join(time_until_arrival_minutes_list))
+        .replace("0", "O")  # in the provided fonts the 0 is skinny and looks awful so use O instead
+        .rstrip()  # no trailing space when a line has no upcoming arrival times
+    )
     logger.debug(f"display_line: {display_line}")
     return display_line
 
