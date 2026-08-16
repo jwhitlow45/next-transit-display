@@ -150,11 +150,14 @@ def display_loop():
                 display_lines = display_lines[:max_display_lines]
                 display_line_arrival_times = display_line_arrival_times[:max_display_lines]
 
-                # only arrival times that made it onto the panel should be able to trigger the departure animation
-                next_arrival_time = min(
-                    (arrival_time for row_times in display_line_arrival_times for arrival_time in row_times),
-                    default=None,
-                )
+                # only arrival times that made it onto the panel should be able to trigger the departure
+                # animation; when the animation is disabled next_arrival_time stays None so the display
+                # never wakes early and never plays it
+                if env.ENABLE_DEPARTURE_ANIMATION == 1:
+                    next_arrival_time = min(
+                        (arrival_time for row_times in display_line_arrival_times for arrival_time in row_times),
+                        default=None,
+                    )
 
                 for idx, display_line in enumerate(display_lines):
                     graphics_display_line_args.append(

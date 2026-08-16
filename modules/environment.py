@@ -56,6 +56,7 @@ for line_reference, stopcode, symbol in zip(
 
 LINE_REFERENCE_ORDER = os.getenv("LINE_REFERENCE_ORDER") or ""
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
+ENABLE_DEPARTURE_ANIMATION = int(os.getenv("ENABLE_DEPARTURE_ANIMATION") or 1)
 FONT = os.getenv("FONT") or ""
 # FONT name should contain "<width>x<height>" (e.g. "5x7.bdf", "clR6x12.bdf") so this gets font width for alignment
 _FONT_DIMENSIONS_MATCH = re.search(r"(\d+)x(\d+)", FONT)

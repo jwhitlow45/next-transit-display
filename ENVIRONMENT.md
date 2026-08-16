@@ -201,6 +201,12 @@ FUTURE_STOP_VISITS_SHOWN="2"
 ```
 How many future stop visits should be shown per line on the display
 
+#### ENABLE_DEPARTURE_ANIMATION
+```
+ENABLE_DEPARTURE_ANIMATION="<0|1>"
+```
+Enables an animation of a convoy of transit vehicles driving through a line's display row when one of its displayed arrival times reaches 0, right before that arrival time disappears from the display. Defaults to 1 (enabled).
+
 ### Font configuration
 #### FONT
 ```
