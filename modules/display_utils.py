@@ -27,6 +27,7 @@ class Colors:
     MAROON = (128, 0, 0)
     SILVER = (192, 192, 192)
     GOLD = (255, 215, 0)
+    CREAM = (255, 240, 200)
     MUNI = (255, 130, 0)
     MUNI_LESS = (150, 30, 0)
     MUNI_ALT = (100, 0, 180)

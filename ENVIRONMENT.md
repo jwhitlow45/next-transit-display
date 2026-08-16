@@ -214,7 +214,7 @@ COLOR="<color-string>"
 ```
 Color of font on the display, the following color options are valid:
 ```
-BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIME NAVY TEAL OLIVE MAROON SILVER GOLD MUNI MUNI_LESS MUNI_ALT MUNI_ALT_LESS
+BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIME NAVY TEAL OLIVE MAROON SILVER GOLD CREAM MUNI MUNI_LESS MUNI_ALT MUNI_ALT_LESS
 ```
 NOTE: These are just default RGB color values I ripped from the internet. Some of them are pretty off on LED matrix displays. Feel free to modify any of them by going into `modules/display_utils.py` and tweaking the RGB values by hand, or adding your own color entries.
 

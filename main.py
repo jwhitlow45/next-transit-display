@@ -11,6 +11,7 @@ from httpx import HTTPStatusError
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from models.SunriseSunset import SunriseSunsetResult
+from modules.departure_animation import play_departure_animation
 from modules.display_utils import (
     Colors,
     FontAlignment,
@@ -86,6 +87,9 @@ def display_loop():
 
     while True:
         try:
+            # soonest arrival time shown on the display, used to time the departure animation
+            next_arrival_time: datetime | None = None
+
             # snapshot the dict reference so drawing doesn't block api_loop; safe because api_loop
             # always replaces the dict rather than mutating it in place
             with display_info_lock:
@@ -94,6 +98,7 @@ def display_loop():
             if display_info_snapshot is not None and len(display_info_snapshot) > 0:
                 now = datetime.now(timezone.utc)
                 display_lines: list[str] = []
+                display_line_arrival_times: list[list[datetime]] = []
 
                 for stopcode, display_info_model in display_info_snapshot.items():
                     sorted_stop_visit_list = sorted(display_info_model.stop_visit_list, key=stop_visit_sort_key)
@@ -123,22 +128,31 @@ def display_loop():
                         line_reference_row_order.sort()
 
                     for line_reference in line_reference_row_order:
+                        line_arrival_times = [
+                            sv.expected_arrival_time
+                            for sv in line_reference_list_map[line_reference]
+                            if sv.expected_arrival_time is not None
+                        ]
                         display_lines.append(
                             generate_display_line_row(
                                 line_reference,
                                 env.LINE_DISAMBIGUATION_SYMBOL_DICT.get(stopcode, {}).get(line_reference, ""),
-                                [
-                                    sv.expected_arrival_time
-                                    for sv in line_reference_list_map[line_reference]
-                                    if sv.expected_arrival_time is not None
-                                ],
+                                line_arrival_times,
                                 now,
                             )
                         )
+                        display_line_arrival_times.append(line_arrival_times)
 
                 # cap rows to what fits on the panel, extra rows would draw off-screen
                 max_display_lines = (env.LED_MATRIX_ROWS - 1) // font.height
                 display_lines = display_lines[:max_display_lines]
+                display_line_arrival_times = display_line_arrival_times[:max_display_lines]
+
+                # only arrival times that made it onto the panel should be able to trigger the departure animation
+                next_arrival_time = min(
+                    (arrival_time for row_times in display_line_arrival_times for arrival_time in row_times),
+                    default=None,
+                )
 
                 graphics_display_line_args = []
                 for idx, display_line in enumerate(display_lines):
@@ -208,7 +222,16 @@ def display_loop():
                 canvas
             )  # draw canvas, set returned canvas as new canvas to prevent flickering
 
-            sleep(env.REFRESH_DISPLAY_INTERVAL_SECONDS)
+            # wake at the next display refresh or when the soonest displayed arrival hits 0, whichever is sooner
+            sleep_seconds = float(env.REFRESH_DISPLAY_INTERVAL_SECONDS)
+            if next_arrival_time is not None:
+                seconds_until_arrival = (next_arrival_time - datetime.now(timezone.utc)).total_seconds()
+                sleep_seconds = min(sleep_seconds, max(seconds_until_arrival, 0))
+            sleep(sleep_seconds)
+
+            # an arrival time just hit 0, celebrate its departure before it disappears from the display
+            if next_arrival_time is not None and datetime.now(timezone.utc) >= next_arrival_time:
+                canvas = play_departure_animation(matrix, canvas, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
         except Exception:
             logger.error("Unexpected exception while trying to display stop data...terminating program", exc_info=True)
             os._exit(1)
