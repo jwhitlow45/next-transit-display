@@ -186,6 +186,21 @@ Example output:
 3  10 20
 ```
 
+#### LINE_ANIMATION_DIRECTIONS
+```
+LINE_ANIMATION_DIRECTIONS=""
+```
+Optional comma-separated list of departure animation directions with each entry corresponding to the same position in LINE_REFERENCES and LINE_STOPCODES. `R` drives the animation left to right and `L` drives it right to left, letting the animation match each line's real direction of travel. The bus always leads the convoy in its direction of travel.
+
+If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) the animation drives left to right. See ENABLE_DEPARTURE_ANIMATION for the animation itself.
+
+Example configuration where line 1 at stop A and line 2 at stop B animate left to right, and line 1 at stop B and line 2 at stop A animate right to left:
+```
+LINE_REFERENCES="1,2,1,2"
+LINE_STOPCODES="A,A,B,B"
+LINE_ANIMATION_DIRECTIONS="R,L,L,R"
+```
+
 ### Display info configuration
 #### LINE_REFERENCE_ORDER
 ```

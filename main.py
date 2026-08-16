@@ -11,7 +11,7 @@ from httpx import HTTPStatusError
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from models.SunriseSunset import SunriseSunsetResult
-from modules.departure_animation import play_departure_animation
+from modules.departure_animation import AnimationDirection, play_departure_animation
 from modules.display_utils import (
     Colors,
     FontAlignment,
@@ -91,6 +91,7 @@ def display_loop():
             # used to time the departure animation and target it at the arriving line's row
             next_arrival_time: datetime | None = None
             display_line_arrival_times: list[list[datetime]] = []
+            display_line_animation_directions: list[AnimationDirection] = []
             graphics_display_line_args = []
 
             # snapshot the dict reference so drawing doesn't block api_loop; safe because api_loop
@@ -144,11 +145,19 @@ def display_loop():
                             )
                         )
                         display_line_arrival_times.append(line_arrival_times)
+                        display_line_animation_directions.append(
+                            AnimationDirection(
+                                env.LINE_ANIMATION_DIRECTION_DICT.get(stopcode, {}).get(
+                                    line_reference, AnimationDirection.LEFT_TO_RIGHT
+                                )
+                            )
+                        )
 
                 # cap rows to what fits on the panel, extra rows would draw off-screen
                 max_display_lines = (env.LED_MATRIX_ROWS - 1) // font.height
                 display_lines = display_lines[:max_display_lines]
                 display_line_arrival_times = display_line_arrival_times[:max_display_lines]
+                display_line_animation_directions = display_line_animation_directions[:max_display_lines]
 
                 # only arrival times that made it onto the panel should be able to trigger the departure
                 # animation; when the animation is disabled next_arrival_time stays None so the display
@@ -250,12 +259,15 @@ def display_loop():
 
                 # rows are drawn with their baseline at 1 + (font.height * (idx + 1)), so the top of a
                 # row's band of pixels sits a full font height above that, just below the baseline above it
-                animation_row_y_pos_list = [2 + (font.height * idx) for idx in animated_row_index_list]
+                animation_row_list = [
+                    (2 + (font.height * idx), display_line_animation_directions[idx])
+                    for idx in animated_row_index_list
+                ]
                 canvas = play_departure_animation(
                     matrix,
                     canvas,
                     env.LED_MATRIX_COLS,
-                    animation_row_y_pos_list,
+                    animation_row_list,
                     font.height,
                     draw_animation_background,
                 )

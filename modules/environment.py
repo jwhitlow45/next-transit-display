@@ -54,6 +54,23 @@ for line_reference, stopcode, symbol in zip(
 ):
     LINE_DISAMBIGUATION_SYMBOL_DICT[stopcode][line_reference] = symbol
 
+# optional departure animation directions aligned with the line disambiguation lists, valued as plain
+# "R"/"L" strings rather than the AnimationDirection enum to avoid a circular import
+_LINE_ANIMATION_DIRECTIONS = os.getenv("LINE_ANIMATION_DIRECTIONS") or ""
+LINE_ANIMATION_DIRECTION_DICT: dict[str, dict[str, str]] = defaultdict(dict)
+if _LINE_ANIMATION_DIRECTIONS:
+    _LINE_ANIMATION_DIRECTION_LIST = _LINE_ANIMATION_DIRECTIONS.split(",")
+    if len(_LINE_ANIMATION_DIRECTION_LIST) != len(_LINE_REFERENCE_LIST):
+        raise ValueError(
+            "Environment variable LINE_ANIMATION_DIRECTIONS must have the same number of entries as LINE_REFERENCES"
+        )
+    if any(direction not in ("R", "L") for direction in _LINE_ANIMATION_DIRECTION_LIST):
+        raise ValueError("Environment variable LINE_ANIMATION_DIRECTIONS entries must be either 'R' or 'L'")
+    for line_reference, stopcode, direction in zip(
+        _LINE_REFERENCE_LIST, _LINE_STOPCODE_LIST, _LINE_ANIMATION_DIRECTION_LIST
+    ):
+        LINE_ANIMATION_DIRECTION_DICT[stopcode][line_reference] = direction
+
 LINE_REFERENCE_ORDER = os.getenv("LINE_REFERENCE_ORDER") or ""
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
 ENABLE_DEPARTURE_ANIMATION = int(os.getenv("ENABLE_DEPARTURE_ANIMATION") or 1)

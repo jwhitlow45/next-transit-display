@@ -1,3 +1,4 @@
+from enum import StrEnum
 from time import monotonic, sleep
 
 from modules.display_utils import Colors
@@ -7,6 +8,12 @@ _ENTRY_EXIT_BUFFER_SECONDS = 0.5  # blank row held before the convoy enters and 
 DEPARTURE_ANIMATION_DURATION_SECONDS = _TRAVEL_DURATION_SECONDS + 2 * _ENTRY_EXIT_BUFFER_SECONDS
 _FRAMES_PER_SECOND = 30
 _VEHICLE_GAP_PIXELS = 6
+
+
+class AnimationDirection(StrEnum):
+    LEFT_TO_RIGHT = "R"
+    RIGHT_TO_LEFT = "L"
+
 
 # "." pixels are transparent, every other character is drawn with its legend color
 _SPRITE_COLOR_LEGEND = {
@@ -57,8 +64,32 @@ _SUBWAY_CAR_SPRITE = [
     "..KK........KK..",
 ]
 
-# vehicles drive left to right with the bus leading, so it sits rightmost in the layout
-_CONVOY = [_SUBWAY_CAR_SPRITE, _STREETCAR_SPRITE, _BUS_SPRITE]
+# sprites are drawn facing right and drive left to right with the bus leading, so it sits rightmost
+_CONVOY_LEFT_TO_RIGHT = [_SUBWAY_CAR_SPRITE, _STREETCAR_SPRITE, _BUS_SPRITE]
+# mirror the sprites and reverse their order so the bus still leads when driving right to left
+_CONVOY_RIGHT_TO_LEFT = [[row[::-1] for row in sprite] for sprite in reversed(_CONVOY_LEFT_TO_RIGHT)]
+_CONVOY_BY_DIRECTION = {
+    AnimationDirection.LEFT_TO_RIGHT: _CONVOY_LEFT_TO_RIGHT,
+    AnimationDirection.RIGHT_TO_LEFT: _CONVOY_RIGHT_TO_LEFT,
+}
+_CONVOY_WIDTH = sum(max(len(row) for row in sprite) for sprite in _CONVOY_LEFT_TO_RIGHT) + _VEHICLE_GAP_PIXELS * (
+    len(_CONVOY_LEFT_TO_RIGHT) - 1
+)
+
+
+def _get_convoy_x_offsets(convoy: list[list[str]]):
+    """Calculates the x offset of each vehicle in a convoy relative to the convoy's left edge"""
+    x_offsets: list[int] = []
+    next_x_offset = 0
+    for sprite in convoy:
+        x_offsets.append(next_x_offset)
+        next_x_offset += max(len(row) for row in sprite) + _VEHICLE_GAP_PIXELS
+    return x_offsets
+
+
+_CONVOY_X_OFFSETS_BY_DIRECTION = {
+    direction: _get_convoy_x_offsets(convoy) for direction, convoy in _CONVOY_BY_DIRECTION.items()
+}
 
 
 def _draw_sprite(canvas, sprite: list[str], x_pos: int, y_pos: int):
@@ -76,49 +107,53 @@ def _draw_sprite(canvas, sprite: list[str], x_pos: int, y_pos: int):
                 canvas.SetPixel(x_pos + x_offset, y_pos + y_offset, *_SPRITE_COLOR_LEGEND[char])
 
 
-def play_departure_animation(matrix, canvas, display_width: int, row_y_pos_list: list[int], row_height: int, draw_background):
+def play_departure_animation(
+    matrix,
+    canvas,
+    display_width: int,
+    animation_row_list: list[tuple[int, AnimationDirection]],
+    row_height: int,
+    draw_background,
+):
     """Plays an animation of a convoy of transit vehicles driving through display rows
 
     Intended to play when a displayed arrival time reaches 0, right before it disappears from the display.
-    The convoy drives through the display rows starting at each y position in row_y_pos_list while
-    draw_background re-draws the rest of the display each frame, erasing only the animated rows for the
-    duration of the animation.
+    The convoy drives through each given display row in that row's direction while draw_background re-draws
+    the rest of the display each frame, erasing only the animated rows for the duration of the animation.
 
     Args:
         matrix: RGBMatrix object to swap animation frames onto
         canvas: back buffer canvas to draw the next frame on
         display_width (int): width of the display in pixels
-        row_y_pos_list (list[int]): y positions of the tops of the display rows to drive through
+        animation_row_list (list[tuple[int, AnimationDirection]]): y position of the top of each display row
+            to drive through paired with the direction to drive through it
         row_height (int): height of a display row in pixels
         draw_background: callable which draws the non-animated display contents onto the canvas passed to it
 
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
     """
-    sprite_widths = [max(len(row) for row in sprite) for sprite in _CONVOY]
-    convoy_width = sum(sprite_widths) + _VEHICLE_GAP_PIXELS * (len(_CONVOY) - 1)
-
-    sprite_x_offsets: list[int] = []
-    next_x_offset = 0
-    for sprite_width in sprite_widths:
-        sprite_x_offsets.append(next_x_offset)
-        next_x_offset += sprite_width + _VEHICLE_GAP_PIXELS
-
-    # travel from fully off-screen left to fully off-screen right, clamping travel_percent so the
-    # entry/exit buffer periods hold a blank row on either side of the crossing
-    travel_distance = display_width + convoy_width
+    # travel from fully off-screen on one side to fully off-screen on the other, clamping travel_percent
+    # so the entry/exit buffer periods hold a blank row on either side of the crossing
+    travel_distance = display_width + _CONVOY_WIDTH
     start_time = monotonic()
     while (elapsed_seconds := monotonic() - start_time) < DEPARTURE_ANIMATION_DURATION_SECONDS:
         travel_elapsed_seconds = elapsed_seconds - _ENTRY_EXIT_BUFFER_SECONDS
         travel_percent = min(max(travel_elapsed_seconds / _TRAVEL_DURATION_SECONDS, 0.0), 1.0)
-        convoy_x_pos = -convoy_width + int(travel_distance * travel_percent)
+        travel_x_distance = int(travel_distance * travel_percent)
 
         canvas.Clear()
         draw_background(canvas)
-        for row_y_pos in row_y_pos_list:
+        for row_y_pos, direction in animation_row_list:
+            if direction == AnimationDirection.LEFT_TO_RIGHT:
+                convoy_x_pos = -_CONVOY_WIDTH + travel_x_distance
+            else:
+                convoy_x_pos = display_width - travel_x_distance
+
             # vehicles ride along the bottom of the row so all wheels share a common road line
             road_y_pos = row_y_pos + row_height
-            for sprite, sprite_x_offset in zip(_CONVOY, sprite_x_offsets):
+            convoy = _CONVOY_BY_DIRECTION[direction]
+            for sprite, sprite_x_offset in zip(convoy, _CONVOY_X_OFFSETS_BY_DIRECTION[direction]):
                 _draw_sprite(canvas, sprite, convoy_x_pos + sprite_x_offset, road_y_pos - len(sprite))
         canvas = matrix.SwapOnVSync(canvas)
 
