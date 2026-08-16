@@ -2,7 +2,9 @@ from time import monotonic, sleep
 
 from modules.display_utils import Colors
 
-DEPARTURE_ANIMATION_DURATION_SECONDS = 2.0
+_TRAVEL_DURATION_SECONDS = 2.0
+_ENTRY_EXIT_BUFFER_SECONDS = 0.5  # blank screen held before the convoy enters and after it exits
+DEPARTURE_ANIMATION_DURATION_SECONDS = _TRAVEL_DURATION_SECONDS + 2 * _ENTRY_EXIT_BUFFER_SECONDS
 _FRAMES_PER_SECOND = 30
 _VEHICLE_GAP_PIXELS = 6
 
@@ -105,11 +107,13 @@ def play_departure_animation(matrix, canvas, display_width: int, display_height:
         sprite_x_offsets.append(next_x_offset)
         next_x_offset += sprite_width + _VEHICLE_GAP_PIXELS
 
-    # travel from fully off-screen left to fully off-screen right
+    # travel from fully off-screen left to fully off-screen right, clamping travel_percent so the
+    # entry/exit buffer periods hold a blank screen on either side of the crossing
     travel_distance = display_width + convoy_width
     start_time = monotonic()
     while (elapsed_seconds := monotonic() - start_time) < DEPARTURE_ANIMATION_DURATION_SECONDS:
-        travel_percent = elapsed_seconds / DEPARTURE_ANIMATION_DURATION_SECONDS
+        travel_elapsed_seconds = elapsed_seconds - _ENTRY_EXIT_BUFFER_SECONDS
+        travel_percent = min(max(travel_elapsed_seconds / _TRAVEL_DURATION_SECONDS, 0.0), 1.0)
         convoy_x_pos = -convoy_width + int(travel_distance * travel_percent)
 
         canvas.Clear()
