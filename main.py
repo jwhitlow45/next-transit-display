@@ -87,8 +87,11 @@ def display_loop():
 
     while True:
         try:
-            # soonest arrival time shown on the display, used to time the departure animation
+            # soonest arrival time shown on the display and the per-row times/draw args behind it,
+            # used to time the departure animation and target it at the arriving line's row
             next_arrival_time: datetime | None = None
+            display_line_arrival_times: list[list[datetime]] = []
+            graphics_display_line_args = []
 
             # snapshot the dict reference so drawing doesn't block api_loop; safe because api_loop
             # always replaces the dict rather than mutating it in place
@@ -98,7 +101,6 @@ def display_loop():
             if display_info_snapshot is not None and len(display_info_snapshot) > 0:
                 now = datetime.now(timezone.utc)
                 display_lines: list[str] = []
-                display_line_arrival_times: list[list[datetime]] = []
 
                 for stopcode, display_info_model in display_info_snapshot.items():
                     sorted_stop_visit_list = sorted(display_info_model.stop_visit_list, key=stop_visit_sort_key)
@@ -154,7 +156,6 @@ def display_loop():
                     default=None,
                 )
 
-                graphics_display_line_args = []
                 for idx, display_line in enumerate(display_lines):
                     graphics_display_line_args.append(
                         (
@@ -229,9 +230,32 @@ def display_loop():
                 sleep_seconds = min(sleep_seconds, max(seconds_until_arrival, 0))
             sleep(sleep_seconds)
 
-            # an arrival time just hit 0, celebrate its departure before it disappears from the display
+            # an arrival time just hit 0, celebrate its departure before it disappears from its display row
             if next_arrival_time is not None and datetime.now(timezone.utc) >= next_arrival_time:
-                canvas = play_departure_animation(matrix, canvas, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
+                animated_row_index_list = [
+                    idx for idx, row_times in enumerate(display_line_arrival_times) if next_arrival_time in row_times
+                ]
+                background_display_line_args = [
+                    args for idx, args in enumerate(graphics_display_line_args) if idx not in animated_row_index_list
+                ]
+
+                # re-draw every row except the animated ones (plus the status LED) behind the convoy each frame
+                def draw_animation_background(animation_canvas):
+                    for args in background_display_line_args:
+                        graphics.DrawText(animation_canvas, font, *args)
+                    animation_canvas.SetPixel(*status_led_xy, *status_led_colors)
+
+                # rows are drawn with their baseline at 1 + (font.height * (idx + 1)), so the top of a
+                # row's band of pixels sits a full font height above that, just below the baseline above it
+                animation_row_y_pos_list = [2 + (font.height * idx) for idx in animated_row_index_list]
+                canvas = play_departure_animation(
+                    matrix,
+                    canvas,
+                    env.LED_MATRIX_COLS,
+                    animation_row_y_pos_list,
+                    font.height,
+                    draw_animation_background,
+                )
         except Exception:
             logger.error("Unexpected exception while trying to display stop data...terminating program", exc_info=True)
             os._exit(1)
