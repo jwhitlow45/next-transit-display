@@ -1,7 +1,7 @@
 import os
 import threading
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from os import path
 from time import sleep
 from zoneinfo import ZoneInfo
@@ -11,7 +11,11 @@ from httpx import HTTPStatusError
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from models.SunriseSunset import SunriseSunsetResult
-from modules.departure_animation import AnimationDirection, play_departure_animation
+from modules.departure_animation import (
+    DEPARTURE_ANIMATION_DURATION_SECONDS,
+    AnimationDirection,
+    play_departure_animation,
+)
 from modules.display_utils import (
     Colors,
     FontAlignment,
@@ -242,10 +246,17 @@ def display_loop():
                 sleep_seconds = min(sleep_seconds, max(seconds_until_arrival, 0))
             sleep(sleep_seconds)
 
-            # an arrival time just hit 0, celebrate its departure before it disappears from its display row
+            # one or more arrival times are hitting 0, celebrate the departures before they disappear from
+            # their display rows; every arrival due before this animation pass finishes shares it so that
+            # back-to-back departures are neither skipped over nor animated twice
             if next_arrival_time is not None and datetime.now(timezone.utc) >= next_arrival_time:
+                animation_end_time = datetime.now(timezone.utc) + timedelta(
+                    seconds=DEPARTURE_ANIMATION_DURATION_SECONDS
+                )
                 animated_row_index_list = [
-                    idx for idx, row_times in enumerate(display_line_arrival_times) if next_arrival_time in row_times
+                    idx
+                    for idx, row_times in enumerate(display_line_arrival_times)
+                    if any(arrival_time <= animation_end_time for arrival_time in row_times)
                 ]
                 background_display_line_args = [
                     args for idx, args in enumerate(graphics_display_line_args) if idx not in animated_row_index_list
