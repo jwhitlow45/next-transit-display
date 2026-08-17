@@ -1,9 +1,10 @@
+import math
 import os
 import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from os import path
-from time import sleep
+from time import monotonic, sleep
 from zoneinfo import ZoneInfo
 
 from httpx import HTTPStatusError
@@ -40,6 +41,13 @@ display_info_lock = threading.Lock()
 
 sunrise_sunset_result: SunriseSunsetResult | None = None
 sunrise_sunset_result_lock = threading.Lock()
+
+# how the leading arrival time of a row pulses just before its departure animation plays; the gentle
+# frequency and brightness floor keep it noticeable without being distracting or blanking the lettering
+PULSE_WINDOW_SECONDS = 5
+PULSE_FREQUENCY_HZ = 1.0
+PULSE_MIN_BRIGHTNESS_PERCENT = 0.4
+PULSE_FRAMES_PER_SECOND = 30
 
 
 def main():
@@ -176,12 +184,67 @@ def apply_sun_based_brightness(canvas):
 
 
 def sleep_until_next_frame(next_arrival_time: datetime | None):
-    """Sleeps until the next display refresh or until the soonest displayed arrival hits 0, whichever is sooner"""
+    """Sleeps until the next display refresh or until the soonest displayed arrival is about to hit 0,
+    whichever is sooner, waking early enough to pulse the arrival time before its departure animation"""
     sleep_seconds = float(env.REFRESH_DISPLAY_INTERVAL_SECONDS)
     if next_arrival_time is not None:
-        seconds_until_arrival = (next_arrival_time - datetime.now(timezone.utc)).total_seconds()
-        sleep_seconds = min(sleep_seconds, max(seconds_until_arrival, 0))
+        seconds_until_pulse_window = (
+            next_arrival_time - datetime.now(timezone.utc)
+        ).total_seconds() - PULSE_WINDOW_SECONDS
+        sleep_seconds = min(sleep_seconds, max(seconds_until_pulse_window, 0))
     sleep(sleep_seconds)
+
+
+def pulse_imminent_arrivals(
+    matrix,
+    canvas,
+    font,
+    next_arrival_time: datetime | None,
+    display_lines: list[str],
+    display_line_arrival_times: list[list[datetime]],
+    graphics_display_line_args,
+    status_led_xy,
+    status_led_colors,
+):
+    """Gently pulses the leading arrival time of rows seconds away from departure, until the soonest is due"""
+    if next_arrival_time is None:
+        return canvas
+    now = datetime.now(timezone.utc)
+    if (next_arrival_time - now).total_seconds() > PULSE_WINDOW_SECONDS:
+        return canvas
+
+    # the leading arrival time is the first entry of the times block at the end of the row text,
+    # where each of the row's times takes 2 characters plus a separating space
+    pulse_segments = []
+    for idx, row_times in enumerate(display_line_arrival_times):
+        if row_times and (min(row_times) - now).total_seconds() <= PULSE_WINDOW_SECONDS:
+            time_char_index = len(display_lines[idx]) - (3 * len(row_times) - 1)
+            pulse_segments.append(
+                (
+                    graphics_display_line_args[idx][0] + time_char_index * env.FONT_WIDTH,
+                    graphics_display_line_args[idx][1],
+                    display_lines[idx][time_char_index : time_char_index + 2],
+                )
+            )
+
+    font_color_rgb = getattr(Colors, env.FONT_COLOR)
+    start_time = monotonic()
+    while (next_arrival_time - datetime.now(timezone.utc)).total_seconds() > 0:
+        # cosine so the pulse starts from full brightness, with a floor so the lettering never goes blank
+        pulse_phase = math.cos(2 * math.pi * PULSE_FREQUENCY_HZ * (monotonic() - start_time))
+        brightness_percent = PULSE_MIN_BRIGHTNESS_PERCENT + (1 - PULSE_MIN_BRIGHTNESS_PERCENT) * (
+            0.5 + 0.5 * pulse_phase
+        )
+        pulse_color = graphics.Color(*(int(channel * brightness_percent) for channel in font_color_rgb))
+
+        # re-draw the normal frame and overdraw the pulsing arrival times in the modulated color
+        draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors)
+        for x_pos, y_pos, segment_text in pulse_segments:
+            graphics.DrawText(canvas, font, x_pos, y_pos, pulse_color, segment_text)
+        canvas = matrix.SwapOnVSync(canvas)
+
+        sleep(1 / PULSE_FRAMES_PER_SECOND)
+    return canvas
 
 
 def play_departure_animation_for_due_arrivals(
@@ -302,6 +365,17 @@ def display_loop():
             )  # draw canvas, set returned canvas as new canvas to prevent flickering
 
             sleep_until_next_frame(next_arrival_time)
+            canvas = pulse_imminent_arrivals(
+                matrix,
+                canvas,
+                font,
+                next_arrival_time,
+                display_lines,
+                display_line_arrival_times,
+                graphics_display_line_args,
+                status_led_xy,
+                status_led_colors,
+            )
             canvas = play_departure_animation_for_due_arrivals(
                 matrix,
                 canvas,
