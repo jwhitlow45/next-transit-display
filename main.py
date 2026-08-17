@@ -109,13 +109,13 @@ def group_stop_visits_by_line(stopcode: str, stop_visit_list: list[StopVisitMode
 
 
 def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: datetime, max_row_count: int):
-    """Builds the text, displayed arrival times, animation direction, and stop index of each display row"""
+    """Builds the text, displayed arrival times, animation direction, and identifier color of each display row"""
     display_lines: list[str] = []
     display_line_arrival_times: list[list[datetime]] = []
     display_line_animation_directions: list[AnimationDirection] = []
-    display_line_stop_indexes: list[int] = []
+    display_line_colors: list[tuple[int, int, int]] = []
 
-    for stop_index, (stopcode, display_info_model) in enumerate(display_info_snapshot.items()):
+    for stopcode, display_info_model in display_info_snapshot.items():
         line_reference_list_map = group_stop_visits_by_line(stopcode, display_info_model.stop_visit_list, now)
         for line_reference, stop_visit_list in line_reference_list_map.items():
             line_arrival_times = [
@@ -137,31 +137,32 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
                     )
                 )
             )
-            display_line_stop_indexes.append(stop_index)
+            display_line_colors.append(
+                getattr(Colors, env.LINE_COLOR_DICT.get(stopcode, {}).get(line_reference, env.FONT_COLOR))
+            )
 
     # cap rows to what fits on the panel, extra rows would draw off-screen
     return (
         display_lines[:max_row_count],
         display_line_arrival_times[:max_row_count],
         display_line_animation_directions[:max_row_count],
-        display_line_stop_indexes[:max_row_count],
+        display_line_colors[:max_row_count],
     )
 
 
 def get_display_line_draw_args(
     display_lines: list[str],
     display_line_arrival_times: list[list[datetime]],
-    display_line_stop_indexes: list[int],
+    display_line_colors: list[tuple[int, int, int]],
     font,
     now: datetime,
 ):
     """Calculates the positioned (x, y, rgb, text) DrawText segments of each display row
 
     Rows are split into an identifier segment and one segment per arrival time so each can be colored
-    independently: identifiers in an amber shade alternating per stop, the leading arrival time by
-    urgency, and far-off :( times faintly
+    independently: identifiers in their line's configured color, the leading arrival time by urgency,
+    and far-off :( times faintly
     """
-    identifier_shades = (Colors.MUNI_AMBER, Colors.MUNI_AMBER_LESS)
     baseline_rgb = getattr(Colors, env.FONT_COLOR)
 
     graphics_display_line_args = []
@@ -176,7 +177,7 @@ def get_display_line_draw_args(
             (
                 row_x_pos,
                 row_y_pos,
-                identifier_shades[display_line_stop_indexes[idx] % len(identifier_shades)],
+                display_line_colors[idx],
                 display_line[:times_char_index],
             )
         ]
@@ -371,7 +372,7 @@ def display_loop():
                 display_lines,
                 display_line_arrival_times,
                 display_line_animation_directions,
-                display_line_stop_indexes,
+                display_line_colors,
             ) = build_display_rows(display_info_snapshot, now, max_display_line_count)
 
             # soonest arrival time shown on the display, used to time the departure animation; when the
@@ -384,7 +385,7 @@ def display_loop():
                 )
 
             graphics_display_line_args = get_display_line_draw_args(
-                display_lines, display_line_arrival_times, display_line_stop_indexes, font, now
+                display_lines, display_line_arrival_times, display_line_colors, font, now
             )
 
             # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display

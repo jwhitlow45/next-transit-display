@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 
 from models.SunriseSunset import SunriseSunsetResult
-from modules.environment import COLOR_LUMINANCE_CAP
+from modules.environment import COLOR_LUMINANCE_CAP, LINE_COLOR_DICT
 from modules.logger import logger
 
 
@@ -66,6 +66,15 @@ if COLOR_LUMINANCE_CAP > 0:
     for _color_name, _color in list(vars(Colors).items()):
         if isinstance(_color, tuple):
             setattr(Colors, _color_name, cap_color_luminance(_color, COLOR_LUMINANCE_CAP))
+
+# fail fast at startup on LINE_COLORS entries which don't name a color above, environment.py cannot
+# validate these itself without a circular import
+for _line_color_map in LINE_COLOR_DICT.values():
+    for _line_color_name in _line_color_map.values():
+        if not isinstance(getattr(Colors, _line_color_name, None), tuple):
+            raise ValueError(
+                f"Environment variable LINE_COLORS entry '{_line_color_name}' is not a valid color name"
+            )
 
 
 class LineReferenceOrder(StrEnum):

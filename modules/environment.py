@@ -71,6 +71,19 @@ if _LINE_ANIMATION_DIRECTIONS:
     ):
         LINE_ANIMATION_DIRECTION_DICT[stopcode][line_reference] = direction
 
+# optional per-line identifier colors aligned with the line disambiguation lists, valued as color names
+# which are validated against the Colors class in display_utils to avoid a circular import here
+_LINE_COLORS = os.getenv("LINE_COLORS") or ""
+LINE_COLOR_DICT: dict[str, dict[str, str]] = defaultdict(dict)
+if _LINE_COLORS:
+    _LINE_COLOR_LIST = _LINE_COLORS.split(",")
+    if len(_LINE_COLOR_LIST) != len(_LINE_REFERENCE_LIST):
+        raise ValueError(
+            "Environment variable LINE_COLORS must have the same number of entries as LINE_REFERENCES"
+        )
+    for line_reference, stopcode, color_name in zip(_LINE_REFERENCE_LIST, _LINE_STOPCODE_LIST, _LINE_COLOR_LIST):
+        LINE_COLOR_DICT[stopcode][line_reference] = color_name
+
 LINE_REFERENCE_ORDER = os.getenv("LINE_REFERENCE_ORDER") or ""
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
 ENABLE_DEPARTURE_ANIMATION = int(os.getenv("ENABLE_DEPARTURE_ANIMATION") or 1)

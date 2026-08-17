@@ -194,6 +194,21 @@ Optional comma-separated list of departure animation directions with each entry 
 
 If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) the animation drives left to right. See ENABLE_DEPARTURE_ANIMATION for the animation itself.
 
+#### LINE_COLORS
+```
+LINE_COLORS=""
+```
+Optional comma-separated list of colors for each line's identifier (the line reference and disambiguation symbol at the left of its row), with each entry corresponding to the same position in LINE_REFERENCES and LINE_STOPCODES. Valid values are the color names listed under FONT_COLOR.
+
+If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) identifiers are displayed in FONT_COLOR.
+
+Example configuration giving each line and direction its own color:
+```
+LINE_REFERENCES="1,2,1,2"
+LINE_STOPCODES="A,A,B,B"
+LINE_COLORS="MUNI,MUNI_ALT,MUNI_AMBER,TEAL"
+```
+
 Example configuration where line 1 at stop A and line 2 at stop B animate left to right, and line 1 at stop B and line 2 at stop A animate right to left:
 ```
 LINE_REFERENCES="1,2,1,2"
@@ -239,7 +254,7 @@ BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIM
 ```
 NOTE: These are just default RGB color values I ripped from the internet. Some of them are pretty off on LED matrix displays. Feel free to modify any of them by going into `modules/display_utils.py` and tweaking the RGB values by hand, or adding your own color entries.
 
-FONT_COLOR sets the baseline color of arrival times. A few display elements use fixed shades of muni orange on top of that baseline: line identifiers alternate between MUNI_AMBER and MUNI_AMBER_LESS per stop, a row's leading arrival time turns MUNI when 1 minute or less away and MUNI_MID when 3 minutes or less away, and far-off `:(` times are shown in MUNI_FAINT. Tweak those color values in `modules/display_utils.py` (or the thresholds at the top of `main.py`) to restyle them.
+FONT_COLOR sets the baseline color of arrival times and the default color of line identifiers (see LINE_COLORS to color identifiers per line). A row's leading arrival time turns MUNI when ARRIVAL_RUN_MINUTES or fewer minutes away and MUNI_MID when ARRIVAL_LEAVE_NOW_MINUTES or fewer minutes away, and far-off `:(` times are shown in MUNI_FAINT. Tweak those color values in `modules/display_utils.py` to restyle them.
 
 #### FONT_X_ALIGNMENT
 ```
