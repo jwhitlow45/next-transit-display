@@ -107,6 +107,32 @@ def _draw_sprite(canvas, sprite: list[str], x_pos: int, y_pos: int):
                 canvas.SetPixel(x_pos + x_offset, y_pos + y_offset, *_SPRITE_COLOR_LEGEND[char])
 
 
+def play_loading_animation(matrix, canvas, display_width: int, display_height: int):
+    """Plays one pass of the transit convoy driving across the vertical center of the display
+
+    Intended to be looped as a loading screen while waiting for the first stop data to arrive
+
+    Args:
+        matrix: RGBMatrix object to swap animation frames onto
+        canvas: back buffer canvas to draw the next frame on
+        display_width (int): width of the display in pixels
+        display_height (int): height of the display in pixels
+
+    Returns:
+        canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
+    """
+    row_height = max(len(sprite) for sprite in _CONVOY_LEFT_TO_RIGHT)
+    row_y_pos = (display_height - row_height) // 2
+    return play_departure_animation(
+        matrix,
+        canvas,
+        display_width,
+        [(row_y_pos, AnimationDirection.LEFT_TO_RIGHT)],
+        row_height,
+        lambda animation_canvas: None,  # nothing but the convoy on a blank display
+    )
+
+
 def play_departure_animation(
     matrix,
     canvas,

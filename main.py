@@ -15,6 +15,7 @@ from modules.departure_animation import (
     DEPARTURE_ANIMATION_DURATION_SECONDS,
     AnimationDirection,
     play_departure_animation,
+    play_loading_animation,
 )
 from modules.display_utils import (
     Colors,
@@ -23,8 +24,6 @@ from modules.display_utils import (
     calculate_display_brightness,
     generate_display_line_row,
     get_status_led_colors,
-    get_text_center_x_pos,
-    get_text_center_y_pos,
     get_text_x_pos,
 )
 from modules.logger import logger
@@ -157,16 +156,6 @@ def draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, 
     canvas.SetPixel(*status_led_xy, *status_led_colors)
 
 
-def draw_loading_frame(canvas, font, font_color):
-    """Draws a centered loading message onto the canvas, shown until the first stop data arrives"""
-    loading_text = "Loading..."
-    text_x_pos = get_text_center_x_pos(loading_text, env.FONT_WIDTH, env.LED_MATRIX_COLS)
-    text_y_pos = get_text_center_y_pos(font.height, env.LED_MATRIX_ROWS)
-
-    canvas.Clear()
-    graphics.DrawText(canvas, font, text_x_pos, text_y_pos, font_color, loading_text)
-
-
 def apply_sun_based_brightness(canvas):
     """Sets the canvas brightness from the day's sunrise/sunset data when sun-based brightness is enabled"""
     if env.ENABLE_SUN_BASED_BRIGHTNESS != 1:
@@ -274,44 +263,38 @@ def display_loop():
             with display_info_lock:
                 display_info_snapshot = display_info_dict
 
-            # soonest arrival time shown on the display and the per-row times/draw args behind it,
-            # used to time the departure animation and target it at the arriving lines' rows
+            # loop the departure convoy across the display as a loading screen until stop data arrives
+            if display_info_snapshot is None or len(display_info_snapshot) == 0:
+                apply_sun_based_brightness(canvas)
+                canvas = play_loading_animation(matrix, canvas, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
+                continue
+
+            now = datetime.now(timezone.utc)
+            display_lines, display_line_arrival_times, display_line_animation_directions = build_display_rows(
+                display_info_snapshot, now, max_display_line_count
+            )
+
+            # soonest arrival time shown on the display, used to time the departure animation; when the
+            # animation is disabled this stays None so the display never wakes early and never plays it
             next_arrival_time: datetime | None = None
-            display_line_arrival_times: list[list[datetime]] = []
-            display_line_animation_directions: list[AnimationDirection] = []
-            graphics_display_line_args = []
-            status_led_colors = Colors.RED
-
-            if display_info_snapshot is not None and len(display_info_snapshot) > 0:
-                now = datetime.now(timezone.utc)
-                display_lines, display_line_arrival_times, display_line_animation_directions = build_display_rows(
-                    display_info_snapshot, now, max_display_line_count
+            if env.ENABLE_DEPARTURE_ANIMATION == 1:
+                next_arrival_time = min(
+                    (arrival_time for row_times in display_line_arrival_times for arrival_time in row_times),
+                    default=None,
                 )
 
-                # only arrival times that made it onto the panel should be able to trigger the departure
-                # animation; when the animation is disabled next_arrival_time stays None so the display
-                # never wakes early and never plays it
-                if env.ENABLE_DEPARTURE_ANIMATION == 1:
-                    next_arrival_time = min(
-                        (arrival_time for row_times in display_line_arrival_times for arrival_time in row_times),
-                        default=None,
-                    )
+            graphics_display_line_args = get_display_line_draw_args(display_lines, font, font_color)
 
-                graphics_display_line_args = get_display_line_draw_args(display_lines, font, font_color)
+            # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display
+            # info is. Use oldest response timestamp to keep this simple
+            oldest_response_timestamp = min(
+                [display_info.response_timestamp for display_info in display_info_snapshot.values()]
+            )
+            logger.debug(f"oldest_response_timestamp: {oldest_response_timestamp}")
+            logger.debug(display_info_snapshot)
+            status_led_colors = get_status_led_colors(oldest_response_timestamp, env.REFRESH_API_INTERVAL_SECONDS)
 
-                # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display
-                # info is. Use oldest response timestamp to keep this simple
-                oldest_response_timestamp = min(
-                    [display_info.response_timestamp for display_info in display_info_snapshot.values()]
-                )
-                logger.debug(f"oldest_response_timestamp: {oldest_response_timestamp}")
-                logger.debug(display_info_snapshot)
-                status_led_colors = get_status_led_colors(oldest_response_timestamp, env.REFRESH_API_INTERVAL_SECONDS)
-
-                draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors)
-            else:
-                draw_loading_frame(canvas, font, font_color)
-
+            draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors)
             apply_sun_based_brightness(canvas)
 
             canvas = matrix.SwapOnVSync(
