@@ -33,6 +33,10 @@ class Colors:
     MUNI_LESS = (150, 30, 0)
     MUNI_ALT = (100, 0, 180)
     MUNI_ALT_LESS = (60, 0, 140)
+    MUNI_MID = (190, 70, 0)
+    MUNI_FAINT = (80, 16, 0)
+    MUNI_AMBER = (150, 85, 0)
+    MUNI_AMBER_LESS = (100, 55, 0)
 
 
 # perceived luminance coefficients (Rec. 601), the eye reads green far brighter than red or blue at equal power

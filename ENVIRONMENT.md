@@ -235,9 +235,11 @@ COLOR="<color-string>"
 ```
 Color of font on the display, the following color options are valid:
 ```
-BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIME NAVY TEAL OLIVE MAROON SILVER GOLD CREAM MUNI MUNI_LESS MUNI_ALT MUNI_ALT_LESS
+BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIME NAVY TEAL OLIVE MAROON SILVER GOLD CREAM MUNI MUNI_LESS MUNI_ALT MUNI_ALT_LESS MUNI_MID MUNI_FAINT MUNI_AMBER MUNI_AMBER_LESS
 ```
 NOTE: These are just default RGB color values I ripped from the internet. Some of them are pretty off on LED matrix displays. Feel free to modify any of them by going into `modules/display_utils.py` and tweaking the RGB values by hand, or adding your own color entries.
+
+FONT_COLOR sets the baseline color of arrival times. A few display elements use fixed shades of muni orange on top of that baseline: line identifiers alternate between MUNI_AMBER and MUNI_AMBER_LESS per stop, a row's leading arrival time turns MUNI when 1 minute or less away and MUNI_MID when 3 minutes or less away, and far-off `:(` times are shown in MUNI_FAINT. Tweak those color values in `modules/display_utils.py` (or the thresholds at the top of `main.py`) to restyle them.
 
 #### FONT_X_ALIGNMENT
 ```

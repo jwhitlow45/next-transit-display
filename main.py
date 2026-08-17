@@ -49,6 +49,11 @@ PULSE_FREQUENCY_HZ = 1.0
 PULSE_MIN_BRIGHTNESS_PERCENT = 0.4
 PULSE_FRAMES_PER_SECOND = 30
 
+# a row's leading arrival time is colored by urgency when its displayed minutes-until-arrival is at or
+# below these thresholds, in shades that stay easy on the eyes in a dark room
+ARRIVAL_RUN_MINUTES = 1
+ARRIVAL_LEAVE_NOW_MINUTES = 3
+
 
 def main():
     # daemon threads so the process can exit on Ctrl+C/SIGTERM instead of hanging on the while True loops
@@ -104,12 +109,13 @@ def group_stop_visits_by_line(stopcode: str, stop_visit_list: list[StopVisitMode
 
 
 def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: datetime, max_row_count: int):
-    """Builds the text, displayed arrival times, and animation direction of each display row"""
+    """Builds the text, displayed arrival times, animation direction, and stop index of each display row"""
     display_lines: list[str] = []
     display_line_arrival_times: list[list[datetime]] = []
     display_line_animation_directions: list[AnimationDirection] = []
+    display_line_stop_indexes: list[int] = []
 
-    for stopcode, display_info_model in display_info_snapshot.items():
+    for stop_index, (stopcode, display_info_model) in enumerate(display_info_snapshot.items()):
         line_reference_list_map = group_stop_visits_by_line(stopcode, display_info_model.stop_visit_list, now)
         for line_reference, stop_visit_list in line_reference_list_map.items():
             line_arrival_times = [
@@ -131,36 +137,73 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
                     )
                 )
             )
+            display_line_stop_indexes.append(stop_index)
 
     # cap rows to what fits on the panel, extra rows would draw off-screen
     return (
         display_lines[:max_row_count],
         display_line_arrival_times[:max_row_count],
         display_line_animation_directions[:max_row_count],
+        display_line_stop_indexes[:max_row_count],
     )
 
 
-def get_display_line_draw_args(display_lines: list[str], font, font_color):
-    """Calculates the (x, y, color, text) DrawText args for each display row"""
+def get_display_line_draw_args(
+    display_lines: list[str],
+    display_line_arrival_times: list[list[datetime]],
+    display_line_stop_indexes: list[int],
+    font,
+    now: datetime,
+):
+    """Calculates the positioned (x, y, rgb, text) DrawText segments of each display row
+
+    Rows are split into an identifier segment and one segment per arrival time so each can be colored
+    independently: identifiers in an amber shade alternating per stop, the leading arrival time by
+    urgency, and far-off :( times faintly
+    """
+    identifier_shades = (Colors.MUNI_AMBER, Colors.MUNI_AMBER_LESS)
+    baseline_rgb = getattr(Colors, env.FONT_COLOR)
+
     graphics_display_line_args = []
     for idx, display_line in enumerate(display_lines):
-        graphics_display_line_args.append(
+        row_x_pos = get_text_x_pos(display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT))
+        row_y_pos = 1 + ((font.height) * (idx + 1))
+        row_times = display_line_arrival_times[idx]
+
+        # the times block sits at the end of the row text, each time taking 2 characters plus a space
+        times_char_index = len(display_line) - (3 * len(row_times) - 1) if row_times else len(display_line)
+        row_segments: list[tuple[int, int, tuple[int, int, int], str]] = [
             (
-                get_text_x_pos(display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT)),
-                1 + ((font.height) * (idx + 1)),
-                font_color,
-                display_line,
+                row_x_pos,
+                row_y_pos,
+                identifier_shades[display_line_stop_indexes[idx] % len(identifier_shades)],
+                display_line[:times_char_index],
             )
-        )
+        ]
+        for time_idx, arrival_time in enumerate(row_times):
+            time_char_index = times_char_index + 3 * time_idx
+            time_text = display_line[time_char_index : time_char_index + 2]
+            minutes_until_arrival = int((arrival_time - now).total_seconds() // 60)
+            if time_text == ":(":
+                time_rgb = Colors.MUNI_FAINT  # so far away there is no need to shout about it
+            elif time_idx == 0 and minutes_until_arrival <= ARRIVAL_RUN_MINUTES:
+                time_rgb = Colors.MUNI  # arriving now, run
+            elif time_idx == 0 and minutes_until_arrival <= ARRIVAL_LEAVE_NOW_MINUTES:
+                time_rgb = Colors.MUNI_MID  # arriving soon, leave now
+            else:
+                time_rgb = baseline_rgb
+            row_segments.append((row_x_pos + time_char_index * env.FONT_WIDTH, row_y_pos, time_rgb, time_text))
+        graphics_display_line_args.append(row_segments)
     return graphics_display_line_args
 
 
 def draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors):
-    """Draws the display rows and status LED onto the canvas"""
+    """Draws the display row segments and status LED onto the canvas"""
     # do all drawing as close as possible to canvas clear to prevent flickering
     canvas.Clear()
-    for draw_text_args in graphics_display_line_args:
-        graphics.DrawText(canvas, font, *draw_text_args)
+    for row_segments in graphics_display_line_args:
+        for x_pos, y_pos, rgb, text in row_segments:
+            graphics.DrawText(canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
     canvas.SetPixel(*status_led_xy, *status_led_colors)
 
 
@@ -200,7 +243,6 @@ def pulse_imminent_arrivals(
     canvas,
     font,
     next_arrival_time: datetime | None,
-    display_lines: list[str],
     display_line_arrival_times: list[list[datetime]],
     graphics_display_line_args,
     status_led_xy,
@@ -213,21 +255,12 @@ def pulse_imminent_arrivals(
     if (next_arrival_time - now).total_seconds() > PULSE_WINDOW_SECONDS:
         return canvas
 
-    # the leading arrival time is the first entry of the times block at the end of the row text,
-    # where each of the row's times takes 2 characters plus a separating space
+    # the leading arrival time is the segment right after the row's identifier segment
     pulse_segments = []
     for idx, row_times in enumerate(display_line_arrival_times):
         if row_times and (min(row_times) - now).total_seconds() <= PULSE_WINDOW_SECONDS:
-            time_char_index = len(display_lines[idx]) - (3 * len(row_times) - 1)
-            pulse_segments.append(
-                (
-                    graphics_display_line_args[idx][0] + time_char_index * env.FONT_WIDTH,
-                    graphics_display_line_args[idx][1],
-                    display_lines[idx][time_char_index : time_char_index + 2],
-                )
-            )
+            pulse_segments.append(graphics_display_line_args[idx][1])
 
-    font_color_rgb = getattr(Colors, env.FONT_COLOR)
     start_time = monotonic()
     while (next_arrival_time - datetime.now(timezone.utc)).total_seconds() > 0:
         # cosine so the pulse starts from full brightness, with a floor so the lettering never goes blank
@@ -235,12 +268,12 @@ def pulse_imminent_arrivals(
         brightness_percent = PULSE_MIN_BRIGHTNESS_PERCENT + (1 - PULSE_MIN_BRIGHTNESS_PERCENT) * (
             0.5 + 0.5 * pulse_phase
         )
-        pulse_color = graphics.Color(*(int(channel * brightness_percent) for channel in font_color_rgb))
 
-        # re-draw the normal frame and overdraw the pulsing arrival times in the modulated color
+        # re-draw the normal frame and overdraw each pulsing arrival time in a dimmed copy of its own color
         draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors)
-        for x_pos, y_pos, segment_text in pulse_segments:
-            graphics.DrawText(canvas, font, x_pos, y_pos, pulse_color, segment_text)
+        for x_pos, y_pos, rgb, text in pulse_segments:
+            pulse_color = graphics.Color(*(int(channel * brightness_percent) for channel in rgb))
+            graphics.DrawText(canvas, font, x_pos, y_pos, pulse_color, text)
         canvas = matrix.SwapOnVSync(canvas)
 
         sleep(1 / PULSE_FRAMES_PER_SECOND)
@@ -277,8 +310,9 @@ def play_departure_animation_for_due_arrivals(
 
     # re-draw every row except the animated ones (plus the status LED) behind the convoy each frame
     def draw_animation_background(animation_canvas):
-        for args in background_display_line_args:
-            graphics.DrawText(animation_canvas, font, *args)
+        for row_segments in background_display_line_args:
+            for x_pos, y_pos, rgb, text in row_segments:
+                graphics.DrawText(animation_canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
         animation_canvas.SetPixel(*status_led_xy, *status_led_colors)
 
     # rows are drawn with their baseline at 1 + (font.height * (idx + 1)), so the top of a
@@ -300,10 +334,10 @@ def display_loop():
     # use bottom-right corner of display for status LED
     status_led_xy = (env.LED_MATRIX_COLS - 1, env.LED_MATRIX_ROWS - 1)
 
-    # setup font
+    # setup font, validating the configured font color exists before the loop starts
     font = graphics.Font()
     font.LoadFont(path.join("fonts", env.FONT))
-    font_color = graphics.Color(*getattr(Colors, env.FONT_COLOR))
+    getattr(Colors, env.FONT_COLOR)
     # number of display rows that fit on the panel
     max_display_line_count = (env.LED_MATRIX_ROWS - 1) // font.height
 
@@ -333,9 +367,12 @@ def display_loop():
                 continue
 
             now = datetime.now(timezone.utc)
-            display_lines, display_line_arrival_times, display_line_animation_directions = build_display_rows(
-                display_info_snapshot, now, max_display_line_count
-            )
+            (
+                display_lines,
+                display_line_arrival_times,
+                display_line_animation_directions,
+                display_line_stop_indexes,
+            ) = build_display_rows(display_info_snapshot, now, max_display_line_count)
 
             # soonest arrival time shown on the display, used to time the departure animation; when the
             # animation is disabled this stays None so the display never wakes early and never plays it
@@ -346,7 +383,9 @@ def display_loop():
                     default=None,
                 )
 
-            graphics_display_line_args = get_display_line_draw_args(display_lines, font, font_color)
+            graphics_display_line_args = get_display_line_draw_args(
+                display_lines, display_line_arrival_times, display_line_stop_indexes, font, now
+            )
 
             # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display
             # info is. Use oldest response timestamp to keep this simple
@@ -370,7 +409,6 @@ def display_loop():
                 canvas,
                 font,
                 next_arrival_time,
-                display_lines,
                 display_line_arrival_times,
                 graphics_display_line_args,
                 status_led_xy,
