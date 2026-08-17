@@ -248,6 +248,14 @@ Alignment of text in the X (left/right) direction, the following alignment optio
 CENTER LEFT
 ```
 
+#### COLOR_LUMINANCE_CAP
+```
+COLOR_LUMINANCE_CAP=""
+```
+Optional perceived brightness cap (1-255) applied to every color the display uses: text, the departure animation vehicles, and the status LED. Colors like white and yellow drive multiple sub-LEDs at once and appear much brighter than colors like red or blue at the same values. Any color whose perceived brightness (0.299R + 0.587G + 0.114B) exceeds the cap is uniformly dimmed down to it, which preserves the color's hue. Colors already at or below the cap are left unchanged, so deliberately dim colors stay dim.
+
+Some perceived brightness reference points: full red is 76, full green is 150, full blue is 29, full white is 255, MUNI is 155, and MUNI_LESS is 62. A good starting point is a value near the perceived brightness of your FONT_COLOR so no decoration outshines the arrival text. Leave empty to disable.
+
 ### Time-based Brightness configuration
 These environment variables are intended to be used to increase/decrease the brightness throughout the day as the sun rises and sets in your area. GPS coordinates are only ever sent to the [SunriseSunset API](https://sunrise-sunset.org/).
 

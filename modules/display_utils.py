@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 
 from models.SunriseSunset import SunriseSunsetResult
+from modules.environment import COLOR_LUMINANCE_CAP
 from modules.logger import logger
 
 
@@ -32,6 +33,35 @@ class Colors:
     MUNI_LESS = (150, 30, 0)
     MUNI_ALT = (100, 0, 180)
     MUNI_ALT_LESS = (60, 0, 140)
+
+
+# perceived luminance coefficients (Rec. 601), the eye reads green far brighter than red or blue at equal power
+_LUMA_COEFFICIENTS = (0.299, 0.587, 0.114)
+
+
+def get_perceived_luminance(color: tuple[int, int, int]):
+    """Calculates the perceived brightness (0-255) of an RGB color as seen by the human eye"""
+    return sum(coefficient * channel for coefficient, channel in zip(_LUMA_COEFFICIENTS, color))
+
+
+def cap_color_luminance(color: tuple[int, int, int], luminance_cap: int):
+    """Uniformly dims a color whose perceived luminance exceeds the cap, preserving its hue
+
+    Colors already at or below the cap are returned unchanged, so deliberately dim colors stay dim
+    """
+    luminance = get_perceived_luminance(color)
+    if luminance <= luminance_cap:
+        return color
+    scale = luminance_cap / luminance
+    return (round(color[0] * scale), round(color[1] * scale), round(color[2] * scale))
+
+
+# dim every palette color brighter than the configured cap so no color visually overpowers another,
+# e.g. full white drives all three sub-LEDs and reads several times brighter than full red or blue
+if COLOR_LUMINANCE_CAP > 0:
+    for _color_name, _color in list(vars(Colors).items()):
+        if isinstance(_color, tuple):
+            setattr(Colors, _color_name, cap_color_luminance(_color, COLOR_LUMINANCE_CAP))
 
 
 class LineReferenceOrder(StrEnum):

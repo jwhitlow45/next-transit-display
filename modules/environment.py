@@ -86,6 +86,11 @@ FONT_WIDTH = int(_FONT_DIMENSIONS_MATCH.group(1))
 FONT_COLOR = os.getenv("FONT_COLOR") or ""
 FONT_ALIGNMENT = os.getenv("FONT_X_ALIGNMENT") or ""
 
+# perceived brightness cap applied to every display color, 0 disables
+COLOR_LUMINANCE_CAP = int(os.getenv("COLOR_LUMINANCE_CAP") or 0)
+if not 0 <= COLOR_LUMINANCE_CAP <= 255:
+    raise ValueError("Environment variable COLOR_LUMINANCE_CAP must be between 0 and 255")
+
 ENABLE_SUN_BASED_BRIGHTNESS = int(os.getenv("ENABLE_SUN_BASED_BRIGHTNESS") or 0)
 SUN_BASED_BRIGHTNESS_LAT = float(os.getenv("SUN_BASED_BRIGHTNESS_LAT") or -1)
 SUN_BASED_BRIGHTNESS_LNG = float(os.getenv("SUN_BASED_BRIGHTNESS_LNG") or -1)
