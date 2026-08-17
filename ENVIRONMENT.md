@@ -237,6 +237,22 @@ ENABLE_DEPARTURE_ANIMATION="<0|1>"
 ```
 Enables an animation of a convoy of transit vehicles driving through a line's display row when one of its displayed arrival times reaches 0, right before that arrival time disappears from the display. Defaults to 1 (enabled).
 
+#### Departure pulse configuration (optional)
+```
+PULSE_WINDOW_SECONDS=""
+PULSE_FREQUENCY_HZ=""
+PULSE_MIN_BRIGHTNESS_PERCENT=""
+PULSE_FRAMES_PER_SECOND=""
+```
+During the last `PULSE_WINDOW_SECONDS` (default 5) before a departure animation plays, the row's leading arrival time gently pulses. `PULSE_FREQUENCY_HZ` (default 1.0) is how many times per second it pulses, `PULSE_MIN_BRIGHTNESS_PERCENT` (default 0.4) is the fraction of full brightness it dips to (must be above 0 so the lettering never goes fully blank, at most 1), and `PULSE_FRAMES_PER_SECOND` (default 30) is how smoothly it animates. The pulse only plays when ENABLE_DEPARTURE_ANIMATION is enabled.
+
+#### Arrival urgency thresholds (optional)
+```
+ARRIVAL_RUN_MINUTES=""
+ARRIVAL_LEAVE_NOW_MINUTES=""
+```
+A row's leading arrival time changes color as it becomes urgent: MUNI when `ARRIVAL_RUN_MINUTES` (default 1) or fewer displayed minutes remain, and MUNI_MID when `ARRIVAL_LEAVE_NOW_MINUTES` (default 3) or fewer remain. See the FONT_COLOR notes for how these colors interact with the rest of the display.
+
 ### Font configuration
 #### FONT
 ```

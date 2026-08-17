@@ -42,18 +42,6 @@ display_info_lock = threading.Lock()
 sunrise_sunset_result: SunriseSunsetResult | None = None
 sunrise_sunset_result_lock = threading.Lock()
 
-# how the leading arrival time of a row pulses just before its departure animation plays; the gentle
-# frequency and brightness floor keep it noticeable without being distracting or blanking the lettering
-PULSE_WINDOW_SECONDS = 5
-PULSE_FREQUENCY_HZ = 1.0
-PULSE_MIN_BRIGHTNESS_PERCENT = 0.4
-PULSE_FRAMES_PER_SECOND = 30
-
-# a row's leading arrival time is colored by urgency when its displayed minutes-until-arrival is at or
-# below these thresholds, in shades that stay easy on the eyes in a dark room
-ARRIVAL_RUN_MINUTES = 1
-ARRIVAL_LEAVE_NOW_MINUTES = 3
-
 
 def main():
     # daemon threads so the process can exit on Ctrl+C/SIGTERM instead of hanging on the while True loops
@@ -187,9 +175,9 @@ def get_display_line_draw_args(
             minutes_until_arrival = int((arrival_time - now).total_seconds() // 60)
             if time_text == ":(":
                 time_rgb = Colors.MUNI_FAINT  # so far away there is no need to shout about it
-            elif time_idx == 0 and minutes_until_arrival <= ARRIVAL_RUN_MINUTES:
+            elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_RUN_MINUTES:
                 time_rgb = Colors.MUNI  # arriving now, run
-            elif time_idx == 0 and minutes_until_arrival <= ARRIVAL_LEAVE_NOW_MINUTES:
+            elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_LEAVE_NOW_MINUTES:
                 time_rgb = Colors.MUNI_MID  # arriving soon, leave now
             else:
                 time_rgb = baseline_rgb
@@ -234,7 +222,7 @@ def sleep_until_next_frame(next_arrival_time: datetime | None):
     if next_arrival_time is not None:
         seconds_until_pulse_window = (
             next_arrival_time - datetime.now(timezone.utc)
-        ).total_seconds() - PULSE_WINDOW_SECONDS
+        ).total_seconds() - env.PULSE_WINDOW_SECONDS
         sleep_seconds = min(sleep_seconds, max(seconds_until_pulse_window, 0))
     sleep(sleep_seconds)
 
@@ -253,20 +241,20 @@ def pulse_imminent_arrivals(
     if next_arrival_time is None:
         return canvas
     now = datetime.now(timezone.utc)
-    if (next_arrival_time - now).total_seconds() > PULSE_WINDOW_SECONDS:
+    if (next_arrival_time - now).total_seconds() > env.PULSE_WINDOW_SECONDS:
         return canvas
 
     # the leading arrival time is the segment right after the row's identifier segment
     pulse_segments = []
     for idx, row_times in enumerate(display_line_arrival_times):
-        if row_times and (min(row_times) - now).total_seconds() <= PULSE_WINDOW_SECONDS:
+        if row_times and (min(row_times) - now).total_seconds() <= env.PULSE_WINDOW_SECONDS:
             pulse_segments.append(graphics_display_line_args[idx][1])
 
     start_time = monotonic()
     while (next_arrival_time - datetime.now(timezone.utc)).total_seconds() > 0:
         # cosine so the pulse starts from full brightness, with a floor so the lettering never goes blank
-        pulse_phase = math.cos(2 * math.pi * PULSE_FREQUENCY_HZ * (monotonic() - start_time))
-        brightness_percent = PULSE_MIN_BRIGHTNESS_PERCENT + (1 - PULSE_MIN_BRIGHTNESS_PERCENT) * (
+        pulse_phase = math.cos(2 * math.pi * env.PULSE_FREQUENCY_HZ * (monotonic() - start_time))
+        brightness_percent = env.PULSE_MIN_BRIGHTNESS_PERCENT + (1 - env.PULSE_MIN_BRIGHTNESS_PERCENT) * (
             0.5 + 0.5 * pulse_phase
         )
 
@@ -277,7 +265,7 @@ def pulse_imminent_arrivals(
             graphics.DrawText(canvas, font, x_pos, y_pos, pulse_color, text)
         canvas = matrix.SwapOnVSync(canvas)
 
-        sleep(1 / PULSE_FRAMES_PER_SECOND)
+        sleep(1 / env.PULSE_FRAMES_PER_SECOND)
     return canvas
 
 

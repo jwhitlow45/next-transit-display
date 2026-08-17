@@ -104,6 +104,23 @@ COLOR_LUMINANCE_CAP = int(os.getenv("COLOR_LUMINANCE_CAP") or 0)
 if not 0 <= COLOR_LUMINANCE_CAP <= 255:
     raise ValueError("Environment variable COLOR_LUMINANCE_CAP must be between 0 and 255")
 
+# how the leading arrival time of a row pulses just before its departure animation plays; gentle defaults
+# keep it noticeable without being distracting
+PULSE_WINDOW_SECONDS = int(os.getenv("PULSE_WINDOW_SECONDS") or 5)
+PULSE_FREQUENCY_HZ = float(os.getenv("PULSE_FREQUENCY_HZ") or 1.0)
+PULSE_MIN_BRIGHTNESS_PERCENT = float(os.getenv("PULSE_MIN_BRIGHTNESS_PERCENT") or 0.4)
+PULSE_FRAMES_PER_SECOND = int(os.getenv("PULSE_FRAMES_PER_SECOND") or 30)
+if not 0 < PULSE_MIN_BRIGHTNESS_PERCENT <= 1:
+    raise ValueError(
+        "Environment variable PULSE_MIN_BRIGHTNESS_PERCENT must be above 0 (so lettering never goes blank) "
+        "and at most 1"
+    )
+
+# a row's leading arrival time is colored by urgency when its displayed minutes-until-arrival is at or
+# below these thresholds
+ARRIVAL_RUN_MINUTES = int(os.getenv("ARRIVAL_RUN_MINUTES") or 1)
+ARRIVAL_LEAVE_NOW_MINUTES = int(os.getenv("ARRIVAL_LEAVE_NOW_MINUTES") or 3)
+
 ENABLE_SUN_BASED_BRIGHTNESS = int(os.getenv("ENABLE_SUN_BASED_BRIGHTNESS") or 0)
 SUN_BASED_BRIGHTNESS_LAT = float(os.getenv("SUN_BASED_BRIGHTNESS_LAT") or -1)
 SUN_BASED_BRIGHTNESS_LNG = float(os.getenv("SUN_BASED_BRIGHTNESS_LNG") or -1)
