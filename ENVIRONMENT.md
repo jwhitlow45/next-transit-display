@@ -86,13 +86,16 @@ How often arrival time calculations are performed based on data fetched from the
 It is necessary for this to be separate from `REFRESH_API_INTERVAL_SECONDS` to allow minutes until arrival time to be re-calculated and updated independent of API requests.
 
 
-### Line disambiguation symbols (optional)
+### Line configuration
 ```
 LINE_REFERENCES=""
 LINE_STOPCODES=""
 LINE_DISAMBIGUATION_SYMBOLS=""
+LINE_ANIMATION_DIRECTIONS=""
+LINE_COLORS=""
+LINE_REFERENCE_ORDER="LINE_REFERENCE"
 ```
-When multiple transit lines share the same reference but travel in different directions (or serve different stops), you can use these variables to assign unique symbols next to line references on your display.
+When multiple transit lines share the same reference but travel in different directions (or serve different stops), you can use the disambiguation variables to assign unique symbols next to line references on your display.
 
 Lines configured here are also always shown on the display, even when they have no upcoming arrivals. In that case only the line reference and its symbol are displayed. Lines not configured here only appear when they have upcoming arrivals.
 
@@ -194,6 +197,13 @@ Optional comma-separated list of departure animation directions with each entry 
 
 If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) the animation drives left to right. See ENABLE_DEPARTURE_ANIMATION for the animation itself.
 
+Example configuration where line 1 at stop A and line 2 at stop B animate left to right, and line 1 at stop B and line 2 at stop A animate right to left:
+```
+LINE_REFERENCES="1,2,1,2"
+LINE_STOPCODES="A,A,B,B"
+LINE_ANIMATION_DIRECTIONS="R,L,L,R"
+```
+
 #### LINE_COLORS
 ```
 LINE_COLORS=""
@@ -209,14 +219,6 @@ LINE_STOPCODES="A,A,B,B"
 LINE_COLORS="MUNI,MUNI_ALT,MUNI_AMBER,TEAL"
 ```
 
-Example configuration where line 1 at stop A and line 2 at stop B animate left to right, and line 1 at stop B and line 2 at stop A animate right to left:
-```
-LINE_REFERENCES="1,2,1,2"
-LINE_STOPCODES="A,A,B,B"
-LINE_ANIMATION_DIRECTIONS="R,L,L,R"
-```
-
-### Display info configuration
 #### LINE_REFERENCE_ORDER
 ```
 LINE_REFERENCE_ORDER="LINE_REFERENCE"
@@ -225,6 +227,8 @@ Parameter which should be used to determine in which order line references shoul
 ```
 LINE_REFERENCE ARRIVAL_TIME
 ```
+
+### Display info configuration
 #### FUTURE_STOP_VISITS_SHOWN
 ```
 FUTURE_STOP_VISITS_SHOWN="2"
