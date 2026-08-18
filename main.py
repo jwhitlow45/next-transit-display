@@ -70,16 +70,16 @@ def stop_visit_sort_key(stop_visit: StopVisitModel):
 
 
 def group_stop_visits_by_line(stopcode: str, stop_visit_list: list[StopVisitModel], now: datetime):
-    """Groups a stop's future visits by line reference, in the order the lines should be displayed"""
+    """Groups a stop's future visits by line reference, in the order the lines should be displayed
+
+    All future visits are kept, beyond just those displayed, so the departure animation can backfill
+    arrival times as displayed ones depart
+    """
     # group by line reference, with each list ordered by expected arrival time
     line_reference_list_map: dict[str, list[StopVisitModel]] = defaultdict(list)
     for stop_visit in sorted(stop_visit_list, key=stop_visit_sort_key):
-        # only display if arriving in future
-        if (
-            stop_visit.expected_arrival_time is not None
-            and stop_visit.expected_arrival_time > now
-            and len(line_reference_list_map[stop_visit.line_reference]) < env.FUTURE_STOP_VISITS_SHOWN
-        ):
+        # only keep visits arriving in the future
+        if stop_visit.expected_arrival_time is not None and stop_visit.expected_arrival_time > now:
             line_reference_list_map[stop_visit.line_reference].append(stop_visit)
 
     # lines configured in LINE_REFERENCES/LINE_STOPCODES are always shown, even when they
@@ -98,7 +98,11 @@ def group_stop_visits_by_line(stopcode: str, stop_visit_list: list[StopVisitMode
 
 
 def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: datetime, max_row_count: int):
-    """Builds the text, displayed arrival times, animation direction, and identifier color of each display row"""
+    """Builds the text, upcoming arrival times, animation direction, and identifier color of each display row
+
+    Each row's arrival times list holds all upcoming arrivals, not just the FUTURE_STOP_VISITS_SHOWN
+    displayed in the row text, so the departure animation can tow in backfill times as arrivals depart
+    """
     display_lines: list[str] = []
     display_line_arrival_times: list[list[datetime]] = []
     display_line_animation_directions: list[AnimationDirection] = []
@@ -114,7 +118,7 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
                 generate_display_line_row(
                     line_reference,
                     env.LINE_DISAMBIGUATION_SYMBOL_DICT.get(stopcode, {}).get(line_reference, ""),
-                    line_arrival_times,
+                    line_arrival_times[: env.FUTURE_STOP_VISITS_SHOWN],
                     now,
                 )
             )
@@ -195,7 +199,8 @@ def get_display_line_draw_args(
     return [
         get_row_draw_segments(
             display_line,
-            display_line_arrival_times[idx],
+            # only the displayed subset of each row's arrival times has segments in the row text
+            display_line_arrival_times[idx][: env.FUTURE_STOP_VISITS_SHOWN],
             display_line_colors[idx],
             1 + (font.height * (idx + 1)),
             now,
@@ -332,22 +337,22 @@ def play_departure_animation_for_due_arrivals(
     animation_row_list = []
     for idx in animated_row_index_list:
         old_segments = graphics_display_line_args[idx]
-        row_times = display_line_arrival_times[idx]
         _, row_baseline_y_pos, identifier_rgb, identifier_text = old_segments[0]
 
         # rebuild the row as it will look once the departed arrivals are removed so the convoy can tow
-        # it into place; segments beyond the identifier are parallel to the row's arrival times
-        remaining_segment_time_pairs = [
-            (segment, arrival_time)
-            for segment, arrival_time in zip(old_segments[1:], row_times)
+        # it into place, backfilling from upcoming arrivals beyond those displayed when available
+        remaining_times = [
+            arrival_time
+            for arrival_time in display_line_arrival_times[idx]
             if arrival_time > animation_end_time
-        ]
-        towed_display_line = (
-            identifier_text + " ".join(segment[3] for segment, _ in remaining_segment_time_pairs)
-        ).rstrip()
+        ][: env.FUTURE_STOP_VISITS_SHOWN]
+        # the identifier segment already holds the formatted reference and symbol, ending with the
+        # separator space when times followed it; re-generating with it re-formats the times fresh
+        identifier_reference = identifier_text[:-1] if identifier_text.endswith(" ") else identifier_text
+        towed_display_line = generate_display_line_row(identifier_reference, "", remaining_times, now)
         towed_segments = get_row_draw_segments(
             towed_display_line,
-            [arrival_time for _, arrival_time in remaining_segment_time_pairs],
+            remaining_times,
             identifier_rgb,
             row_baseline_y_pos,
             now,
