@@ -152,6 +152,8 @@ def get_display_line_draw_args(
     and far-off :( times faintly
     """
     baseline_rgb = getattr(Colors, env.FONT_COLOR)
+    run_rgb = getattr(Colors, env.ARRIVAL_RUN_COLOR)
+    leave_now_rgb = getattr(Colors, env.ARRIVAL_LEAVE_NOW_COLOR)
 
     graphics_display_line_args = []
     for idx, display_line in enumerate(display_lines):
@@ -176,9 +178,9 @@ def get_display_line_draw_args(
             if time_text == ":(":
                 time_rgb = Colors.MUNI_FAINT  # so far away there is no need to shout about it
             elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_RUN_MINUTES:
-                time_rgb = Colors.MUNI  # arriving now, run
+                time_rgb = run_rgb  # arriving now, run
             elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_LEAVE_NOW_MINUTES:
-                time_rgb = Colors.MUNI_MID  # arriving soon, leave now
+                time_rgb = leave_now_rgb  # arriving soon, leave now
             else:
                 time_rgb = baseline_rgb
             row_segments.append((row_x_pos + time_char_index * env.FONT_WIDTH, row_y_pos, time_rgb, time_text))

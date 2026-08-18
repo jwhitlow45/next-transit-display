@@ -117,9 +117,12 @@ if not 0 < PULSE_MIN_BRIGHTNESS_PERCENT <= 1:
     )
 
 # a row's leading arrival time is colored by urgency when its displayed minutes-until-arrival is at or
-# below these thresholds
+# below these thresholds; color names are validated against the Colors class in display_utils to avoid
+# a circular import here
 ARRIVAL_RUN_MINUTES = int(os.getenv("ARRIVAL_RUN_MINUTES") or 1)
 ARRIVAL_LEAVE_NOW_MINUTES = int(os.getenv("ARRIVAL_LEAVE_NOW_MINUTES") or 3)
+ARRIVAL_RUN_COLOR = os.getenv("ARRIVAL_RUN_COLOR") or "MUNI"
+ARRIVAL_LEAVE_NOW_COLOR = os.getenv("ARRIVAL_LEAVE_NOW_COLOR") or "MUNI_MID"
 
 ENABLE_SUN_BASED_BRIGHTNESS = int(os.getenv("ENABLE_SUN_BASED_BRIGHTNESS") or 0)
 SUN_BASED_BRIGHTNESS_LAT = float(os.getenv("SUN_BASED_BRIGHTNESS_LAT") or -1)

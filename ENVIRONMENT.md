@@ -250,8 +250,10 @@ During the last `PULSE_WINDOW_SECONDS` (default 5) before a departure animation 
 ```
 ARRIVAL_RUN_MINUTES=""
 ARRIVAL_LEAVE_NOW_MINUTES=""
+ARRIVAL_RUN_COLOR=""
+ARRIVAL_LEAVE_NOW_COLOR=""
 ```
-A row's leading arrival time changes color as it becomes urgent: MUNI when `ARRIVAL_RUN_MINUTES` (default 1) or fewer displayed minutes remain, and MUNI_MID when `ARRIVAL_LEAVE_NOW_MINUTES` (default 3) or fewer remain. See the FONT_COLOR notes for how these colors interact with the rest of the display.
+A row's leading arrival time changes color as it becomes urgent: `ARRIVAL_RUN_COLOR` (default MUNI) when `ARRIVAL_RUN_MINUTES` (default 1) or fewer displayed minutes remain, and `ARRIVAL_LEAVE_NOW_COLOR` (default MUNI_MID) when `ARRIVAL_LEAVE_NOW_MINUTES` (default 3) or fewer remain. Valid color values are the color names listed under FONT_COLOR.
 
 ### Font configuration
 #### FONT
@@ -270,7 +272,7 @@ BLACK WHITE RED GREEN BLUE YELLOW CYAN MAGENTA GRAY ORANGE PURPLE BROWN PINK LIM
 ```
 NOTE: These are just default RGB color values I ripped from the internet. Some of them are pretty off on LED matrix displays. Feel free to modify any of them by going into `modules/display_utils.py` and tweaking the RGB values by hand, or adding your own color entries.
 
-FONT_COLOR sets the baseline color of arrival times and the default color of line identifiers (see LINE_COLORS to color identifiers per line). A row's leading arrival time turns MUNI when ARRIVAL_RUN_MINUTES or fewer minutes away and MUNI_MID when ARRIVAL_LEAVE_NOW_MINUTES or fewer minutes away, and far-off `:(` times are shown in MUNI_FAINT. Tweak those color values in `modules/display_utils.py` to restyle them.
+FONT_COLOR sets the baseline color of arrival times and the default color of line identifiers (see LINE_COLORS to color identifiers per line). A row's leading arrival time changes color as it becomes urgent (see the arrival urgency threshold variables), and far-off `:(` times are shown in MUNI_FAINT.
 
 #### FONT_X_ALIGNMENT
 ```
