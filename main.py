@@ -107,6 +107,7 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
     display_line_arrival_times: list[list[datetime]] = []
     display_line_animation_directions: list[AnimationDirection] = []
     display_line_colors: list[tuple[int, int, int]] = []
+    display_line_keys: list[tuple[str, str]] = []
 
     for stopcode, display_info_model in display_info_snapshot.items():
         line_reference_list_map = group_stop_visits_by_line(stopcode, display_info_model.stop_visit_list, now)
@@ -133,6 +134,7 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
             display_line_colors.append(
                 getattr(Colors, env.LINE_COLOR_DICT.get(stopcode, {}).get(line_reference, env.FONT_COLOR))
             )
+            display_line_keys.append((stopcode, line_reference))
 
     # cap rows to what fits on the panel, extra rows would draw off-screen
     return (
@@ -140,6 +142,7 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
         display_line_arrival_times[:max_row_count],
         display_line_animation_directions[:max_row_count],
         display_line_colors[:max_row_count],
+        display_line_keys[:max_row_count],
     )
 
 
@@ -298,6 +301,7 @@ def play_departure_animation_for_due_arrivals(
     font,
     next_arrival_time: datetime | None,
     display_line_arrival_times: list[list[datetime]],
+    display_line_keys: list[tuple[str, str]],
     display_line_animation_directions: list[AnimationDirection],
     graphics_display_line_args,
     status_led_xy,
@@ -334,6 +338,11 @@ def play_departure_animation_for_due_arrivals(
             dimmed_color = graphics.Color(*(int(channel * brightness_percent) for channel in rgb))
             graphics.DrawText(animation_canvas, font, x_pos + x_offset, y_pos, dimmed_color, text)
 
+    # tow in times from the freshest fetched data so any predictions fetched since the last display
+    # render are included, since the API only ever publishes a few predictions per line
+    with display_info_lock:
+        display_info_snapshot = display_info_dict
+
     animation_row_list = []
     for idx in animated_row_index_list:
         old_segments = graphics_display_line_args[idx]
@@ -341,10 +350,19 @@ def play_departure_animation_for_due_arrivals(
 
         # rebuild the row as it will look once the departed arrivals are removed so the convoy can tow
         # it into place, backfilling from upcoming arrivals beyond those displayed when available
+        stopcode, line_reference = display_line_keys[idx]
+        upcoming_times = display_line_arrival_times[idx]
+        if display_info_snapshot is not None and stopcode in display_info_snapshot:
+            fresh_stop_visits = group_stop_visits_by_line(
+                stopcode, display_info_snapshot[stopcode].stop_visit_list, now
+            ).get(line_reference, [])
+            upcoming_times = [
+                stop_visit.expected_arrival_time
+                for stop_visit in fresh_stop_visits
+                if stop_visit.expected_arrival_time is not None
+            ]
         remaining_times = [
-            arrival_time
-            for arrival_time in display_line_arrival_times[idx]
-            if arrival_time > animation_end_time
+            arrival_time for arrival_time in upcoming_times if arrival_time > animation_end_time
         ][: env.FUTURE_STOP_VISITS_SHOWN]
         # the identifier segment already holds the formatted reference and symbol, ending with the
         # separator space when times followed it; re-generating with it re-formats the times fresh
@@ -424,6 +442,7 @@ def display_loop():
                 display_line_arrival_times,
                 display_line_animation_directions,
                 display_line_colors,
+                display_line_keys,
             ) = build_display_rows(display_info_snapshot, now, max_display_line_count)
 
             # soonest arrival time shown on the display, used to time the departure animation; when the
@@ -472,6 +491,7 @@ def display_loop():
                 font,
                 next_arrival_time,
                 display_line_arrival_times,
+                display_line_keys,
                 display_line_animation_directions,
                 graphics_display_line_args,
                 status_led_xy,
