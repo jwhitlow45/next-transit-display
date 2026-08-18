@@ -1,13 +1,15 @@
+from dataclasses import dataclass, field
 from enum import StrEnum
 from time import monotonic, sleep
 
 from modules.display_utils import Colors
 
 _TRAVEL_DURATION_SECONDS = 2.0
-_ENTRY_EXIT_BUFFER_SECONDS = 0.5  # blank row held before the convoy enters and after it exits
+_ENTRY_EXIT_BUFFER_SECONDS = 0.5  # row fade-out before the convoy enters, settle time after it exits
 DEPARTURE_ANIMATION_DURATION_SECONDS = _TRAVEL_DURATION_SECONDS + 2 * _ENTRY_EXIT_BUFFER_SECONDS
 _FRAMES_PER_SECOND = 30
 _VEHICLE_GAP_PIXELS = 6
+_TOW_GAP_PIXELS = 5  # gap between the last vehicle and the row contents it tows
 
 
 class AnimationDirection(StrEnum):
@@ -92,6 +94,25 @@ _CONVOY_X_OFFSETS_BY_DIRECTION = {
 }
 
 
+@dataclass
+class DepartureAnimationRow:
+    """A display row for the departure animation to drive through
+
+    row_y_pos is the y position of the top of the row's band of pixels and direction is the direction
+    the convoy drives through it. fading_segments are the row's current (x, y, rgb, text) contents,
+    faded out before the convoy enters. towed_segments are the row's post-departure contents positioned
+    at their final resting places, towed into place behind the convoy, with towed_left_x/towed_right_x
+    their resting pixel bounds.
+    """
+
+    row_y_pos: int
+    direction: AnimationDirection
+    fading_segments: list[tuple[int, int, tuple[int, int, int], str]] = field(default_factory=list)
+    towed_segments: list[tuple[int, int, tuple[int, int, int], str]] = field(default_factory=list)
+    towed_left_x: int = 0
+    towed_right_x: int = 0
+
+
 def _draw_sprite(canvas, sprite: list[str], x_pos: int, y_pos: int):
     """Draws a sprite onto a canvas with its top-left corner at (x_pos, y_pos)
 
@@ -105,6 +126,37 @@ def _draw_sprite(canvas, sprite: list[str], x_pos: int, y_pos: int):
         for x_offset, char in enumerate(row):
             if char != ".":
                 canvas.SetPixel(x_pos + x_offset, y_pos + y_offset, *_SPRITE_COLOR_LEGEND[char])
+
+
+def _draw_convoy_towing_row(canvas, animation_row: DepartureAnimationRow, row_height: int, display_width: int, travel_percent: float, draw_segments):
+    """Draws one row's convoy at its position along its travel with the row's towed contents behind it"""
+    # travel from fully off-screen to far enough past the other edge that the towed contents, which
+    # trail behind the convoy and stop at their resting positions, are fully towed into place
+    if animation_row.direction == AnimationDirection.LEFT_TO_RIGHT:
+        convoy_end_x_pos = max(display_width, animation_row.towed_right_x + _TOW_GAP_PIXELS)
+        convoy_x_pos = -_CONVOY_WIDTH + int((convoy_end_x_pos + _CONVOY_WIDTH) * travel_percent)
+        tow_x_offset = min(convoy_x_pos - _TOW_GAP_PIXELS - animation_row.towed_right_x, 0)
+        rope_x_range = range(animation_row.towed_right_x + tow_x_offset, convoy_x_pos)
+        still_towing = tow_x_offset < 0
+    else:
+        convoy_end_x_pos = min(-_CONVOY_WIDTH, animation_row.towed_left_x - _TOW_GAP_PIXELS - _CONVOY_WIDTH)
+        convoy_x_pos = display_width - int((display_width - convoy_end_x_pos) * travel_percent)
+        tow_x_offset = max(convoy_x_pos + _CONVOY_WIDTH + _TOW_GAP_PIXELS - animation_row.towed_left_x, 0)
+        rope_x_range = range(convoy_x_pos + _CONVOY_WIDTH, animation_row.towed_left_x + tow_x_offset)
+        still_towing = tow_x_offset > 0
+
+    # vehicles ride along the bottom of the row so all wheels share a common road line
+    road_y_pos = animation_row.row_y_pos + row_height
+    convoy = _CONVOY_BY_DIRECTION[animation_row.direction]
+    for sprite, sprite_x_offset in zip(convoy, _CONVOY_X_OFFSETS_BY_DIRECTION[animation_row.direction]):
+        _draw_sprite(canvas, sprite, convoy_x_pos + sprite_x_offset, road_y_pos - len(sprite))
+
+    draw_segments(canvas, animation_row.towed_segments, 1.0, tow_x_offset)
+    if still_towing and animation_row.towed_segments:
+        # a small tow rope between the last vehicle and the row contents it is towing
+        rope_y_pos = animation_row.row_y_pos + (row_height // 2)
+        for rope_x_pos in rope_x_range:
+            canvas.SetPixel(rope_x_pos, rope_y_pos, *_SPRITE_COLOR_LEGEND["K"])
 
 
 def play_loading_animation(matrix, canvas, display_width: int, display_height: int):
@@ -127,60 +179,49 @@ def play_loading_animation(matrix, canvas, display_width: int, display_height: i
         matrix,
         canvas,
         display_width,
-        [(row_y_pos, AnimationDirection.LEFT_TO_RIGHT)],
+        [DepartureAnimationRow(row_y_pos=row_y_pos, direction=AnimationDirection.LEFT_TO_RIGHT)],
         row_height,
         lambda animation_canvas: None,  # nothing but the convoy on a blank display
+        lambda animation_canvas, segments, brightness_percent, x_offset: None,  # nothing to fade or tow
     )
 
 
-def play_departure_animation(
-    matrix,
-    canvas,
-    display_width: int,
-    animation_row_list: list[tuple[int, AnimationDirection]],
-    row_height: int,
-    draw_background,
-):
-    """Plays an animation of a convoy of transit vehicles driving through display rows
+def play_departure_animation(matrix, canvas, display_width: int, animation_row_list: list[DepartureAnimationRow], row_height: int, draw_background, draw_segments):
+    """Plays an animation of convoys of transit vehicles driving through display rows
 
-    Intended to play when a displayed arrival time reaches 0, right before it disappears from the display.
-    The convoy drives through each given display row in that row's direction while draw_background re-draws
-    the rest of the display each frame, erasing only the animated rows for the duration of the animation.
+    Intended to play when displayed arrival times reach 0. Each row's current contents fade out, then a
+    convoy drives through the row in its direction towing the row's post-departure contents behind it,
+    which settle into their resting positions as the convoy drives off the display. draw_background
+    re-draws the rest of the display each frame so only the animated rows change.
 
     Args:
         matrix: RGBMatrix object to swap animation frames onto
         canvas: back buffer canvas to draw the next frame on
         display_width (int): width of the display in pixels
-        animation_row_list (list[tuple[int, AnimationDirection]]): y position of the top of each display row
-            to drive through paired with the direction to drive through it
+        animation_row_list (list[DepartureAnimationRow]): the display rows to drive through
         row_height (int): height of a display row in pixels
         draw_background: callable which draws the non-animated display contents onto the canvas passed to it
+        draw_segments: callable which draws (canvas, segments, brightness_percent, x_offset), used to
+            fade out each row's current contents and to draw its towed contents mid-tow
 
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
     """
-    # travel from fully off-screen on one side to fully off-screen on the other, clamping travel_percent
-    # so the entry/exit buffer periods hold a blank row on either side of the crossing
-    travel_distance = display_width + _CONVOY_WIDTH
     start_time = monotonic()
     while (elapsed_seconds := monotonic() - start_time) < DEPARTURE_ANIMATION_DURATION_SECONDS:
         travel_elapsed_seconds = elapsed_seconds - _ENTRY_EXIT_BUFFER_SECONDS
         travel_percent = min(max(travel_elapsed_seconds / _TRAVEL_DURATION_SECONDS, 0.0), 1.0)
-        travel_x_distance = int(travel_distance * travel_percent)
 
         canvas.Clear()
         draw_background(canvas)
-        for row_y_pos, direction in animation_row_list:
-            if direction == AnimationDirection.LEFT_TO_RIGHT:
-                convoy_x_pos = -_CONVOY_WIDTH + travel_x_distance
-            else:
-                convoy_x_pos = display_width - travel_x_distance
-
-            # vehicles ride along the bottom of the row so all wheels share a common road line
-            road_y_pos = row_y_pos + row_height
-            convoy = _CONVOY_BY_DIRECTION[direction]
-            for sprite, sprite_x_offset in zip(convoy, _CONVOY_X_OFFSETS_BY_DIRECTION[direction]):
-                _draw_sprite(canvas, sprite, convoy_x_pos + sprite_x_offset, road_y_pos - len(sprite))
+        if travel_percent == 0:
+            # rows fade out before their convoys enter the display
+            fade_brightness_percent = max(1 - (elapsed_seconds / _ENTRY_EXIT_BUFFER_SECONDS), 0.0)
+            for animation_row in animation_row_list:
+                draw_segments(canvas, animation_row.fading_segments, fade_brightness_percent, 0)
+        else:
+            for animation_row in animation_row_list:
+                _draw_convoy_towing_row(canvas, animation_row, row_height, display_width, travel_percent, draw_segments)
         canvas = matrix.SwapOnVSync(canvas)
 
         sleep(1 / _FRAMES_PER_SECOND)

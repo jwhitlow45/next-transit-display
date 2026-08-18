@@ -239,7 +239,7 @@ How many future stop visits should be shown per line on the display
 ```
 ENABLE_DEPARTURE_ANIMATION="<0|1>"
 ```
-Enables an animation of a convoy of transit vehicles driving through a line's display row when one of its displayed arrival times reaches 0, right before that arrival time disappears from the display. Defaults to 1 (enabled).
+Enables an animation played when a line's displayed arrival time reaches 0: the row fades out, then a convoy of transit vehicles drives through it towing the row's remaining arrival times into place behind it. Defaults to 1 (enabled).
 
 #### Departure pulse configuration (optional)
 ```

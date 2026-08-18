@@ -15,6 +15,7 @@ from models.SunriseSunset import SunriseSunsetResult
 from modules.departure_animation import (
     DEPARTURE_ANIMATION_DURATION_SECONDS,
     AnimationDirection,
+    DepartureAnimationRow,
     play_departure_animation,
     play_loading_animation,
 )
@@ -138,14 +139,14 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
     )
 
 
-def get_display_line_draw_args(
-    display_lines: list[str],
-    display_line_arrival_times: list[list[datetime]],
-    display_line_colors: list[tuple[int, int, int]],
-    font,
+def get_row_draw_segments(
+    display_line: str,
+    row_times: list[datetime],
+    identifier_rgb: tuple[int, int, int],
+    row_y_pos: int,
     now: datetime,
 ):
-    """Calculates the positioned (x, y, rgb, text) DrawText segments of each display row
+    """Calculates the positioned (x, y, rgb, text) DrawText segments of a single display row
 
     Rows are split into an identifier segment and one segment per arrival time so each can be colored
     independently: identifiers in their line's configured color, the leading arrival time by urgency,
@@ -155,37 +156,52 @@ def get_display_line_draw_args(
     run_rgb = getattr(Colors, env.ARRIVAL_RUN_COLOR)
     leave_now_rgb = getattr(Colors, env.ARRIVAL_LEAVE_NOW_COLOR)
 
-    graphics_display_line_args = []
-    for idx, display_line in enumerate(display_lines):
-        row_x_pos = get_text_x_pos(display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT))
-        row_y_pos = 1 + ((font.height) * (idx + 1))
-        row_times = display_line_arrival_times[idx]
+    row_x_pos = get_text_x_pos(display_line, env.FONT_WIDTH, env.LED_MATRIX_COLS, FontAlignment(env.FONT_ALIGNMENT))
 
-        # the times block sits at the end of the row text, each time taking 2 characters plus a space
-        times_char_index = len(display_line) - (3 * len(row_times) - 1) if row_times else len(display_line)
-        row_segments: list[tuple[int, int, tuple[int, int, int], str]] = [
-            (
-                row_x_pos,
-                row_y_pos,
-                display_line_colors[idx],
-                display_line[:times_char_index],
-            )
-        ]
-        for time_idx, arrival_time in enumerate(row_times):
-            time_char_index = times_char_index + 3 * time_idx
-            time_text = display_line[time_char_index : time_char_index + 2]
-            minutes_until_arrival = int((arrival_time - now).total_seconds() // 60)
-            if time_text == ":(":
-                time_rgb = Colors.MUNI_FAINT  # so far away there is no need to shout about it
-            elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_RUN_MINUTES:
-                time_rgb = run_rgb  # arriving now, run
-            elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_LEAVE_NOW_MINUTES:
-                time_rgb = leave_now_rgb  # arriving soon, leave now
-            else:
-                time_rgb = baseline_rgb
-            row_segments.append((row_x_pos + time_char_index * env.FONT_WIDTH, row_y_pos, time_rgb, time_text))
-        graphics_display_line_args.append(row_segments)
-    return graphics_display_line_args
+    # the times block sits at the end of the row text, each time taking 2 characters plus a space
+    times_char_index = len(display_line) - (3 * len(row_times) - 1) if row_times else len(display_line)
+    row_segments: list[tuple[int, int, tuple[int, int, int], str]] = [
+        (
+            row_x_pos,
+            row_y_pos,
+            identifier_rgb,
+            display_line[:times_char_index],
+        )
+    ]
+    for time_idx, arrival_time in enumerate(row_times):
+        time_char_index = times_char_index + 3 * time_idx
+        time_text = display_line[time_char_index : time_char_index + 2]
+        minutes_until_arrival = int((arrival_time - now).total_seconds() // 60)
+        if time_text == ":(":
+            time_rgb = Colors.MUNI_FAINT  # so far away there is no need to shout about it
+        elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_RUN_MINUTES:
+            time_rgb = run_rgb  # arriving now, run
+        elif time_idx == 0 and minutes_until_arrival <= env.ARRIVAL_LEAVE_NOW_MINUTES:
+            time_rgb = leave_now_rgb  # arriving soon, leave now
+        else:
+            time_rgb = baseline_rgb
+        row_segments.append((row_x_pos + time_char_index * env.FONT_WIDTH, row_y_pos, time_rgb, time_text))
+    return row_segments
+
+
+def get_display_line_draw_args(
+    display_lines: list[str],
+    display_line_arrival_times: list[list[datetime]],
+    display_line_colors: list[tuple[int, int, int]],
+    font,
+    now: datetime,
+):
+    """Calculates the positioned (x, y, rgb, text) DrawText segments of each display row"""
+    return [
+        get_row_draw_segments(
+            display_line,
+            display_line_arrival_times[idx],
+            display_line_colors[idx],
+            1 + (font.height * (idx + 1)),
+            now,
+        )
+        for idx, display_line in enumerate(display_lines)
+    ]
 
 
 def draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors):
@@ -289,7 +305,8 @@ def play_departure_animation_for_due_arrivals(
     # one or more arrival times are hitting 0, celebrate the departures before they disappear from
     # their display rows; every arrival due before this animation pass finishes shares it so that
     # back-to-back departures are neither skipped over nor animated twice
-    animation_end_time = datetime.now(timezone.utc) + timedelta(seconds=DEPARTURE_ANIMATION_DURATION_SECONDS)
+    now = datetime.now(timezone.utc)
+    animation_end_time = now + timedelta(seconds=DEPARTURE_ANIMATION_DURATION_SECONDS)
     animated_row_index_list = [
         idx
         for idx, row_times in enumerate(display_line_arrival_times)
@@ -306,11 +323,49 @@ def play_departure_animation_for_due_arrivals(
                 graphics.DrawText(animation_canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
         animation_canvas.SetPixel(*status_led_xy, *status_led_colors)
 
-    # rows are drawn with their baseline at 1 + (font.height * (idx + 1)), so the top of a
-    # row's band of pixels sits a full font height above that, just below the baseline above it
-    animation_row_list = [
-        (2 + (font.height * idx), display_line_animation_directions[idx]) for idx in animated_row_index_list
-    ]
+    # animated rows draw their segments at a brightness and x offset so they can fade out and be towed in
+    def draw_animation_segments(animation_canvas, segments, brightness_percent, x_offset):
+        for x_pos, y_pos, rgb, text in segments:
+            dimmed_color = graphics.Color(*(int(channel * brightness_percent) for channel in rgb))
+            graphics.DrawText(animation_canvas, font, x_pos + x_offset, y_pos, dimmed_color, text)
+
+    animation_row_list = []
+    for idx in animated_row_index_list:
+        old_segments = graphics_display_line_args[idx]
+        row_times = display_line_arrival_times[idx]
+        _, row_baseline_y_pos, identifier_rgb, identifier_text = old_segments[0]
+
+        # rebuild the row as it will look once the departed arrivals are removed so the convoy can tow
+        # it into place; segments beyond the identifier are parallel to the row's arrival times
+        remaining_segment_time_pairs = [
+            (segment, arrival_time)
+            for segment, arrival_time in zip(old_segments[1:], row_times)
+            if arrival_time > animation_end_time
+        ]
+        towed_display_line = (
+            identifier_text + " ".join(segment[3] for segment, _ in remaining_segment_time_pairs)
+        ).rstrip()
+        towed_segments = get_row_draw_segments(
+            towed_display_line,
+            [arrival_time for _, arrival_time in remaining_segment_time_pairs],
+            identifier_rgb,
+            row_baseline_y_pos,
+            now,
+        )
+
+        animation_row_list.append(
+            DepartureAnimationRow(
+                # rows are drawn with their baseline at 1 + (font.height * (idx + 1)), so the top of a
+                # row's band of pixels sits a full font height above that, just below the baseline above it
+                row_y_pos=row_baseline_y_pos - font.height + 1,
+                direction=display_line_animation_directions[idx],
+                fading_segments=old_segments,
+                towed_segments=towed_segments,
+                towed_left_x=min(segment[0] for segment in towed_segments),
+                towed_right_x=max(segment[0] + (len(segment[3]) * env.FONT_WIDTH) for segment in towed_segments),
+            )
+        )
+
     return play_departure_animation(
         matrix,
         canvas,
@@ -318,6 +373,7 @@ def play_departure_animation_for_due_arrivals(
         animation_row_list,
         font.height,
         draw_animation_background,
+        draw_animation_segments,
     )
 
 
