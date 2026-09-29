@@ -4,7 +4,7 @@ from typing import Any, Literal
 import httpx
 from httpx_retries import Retry, RetryTransport
 
-from models.OpenData511 import TransitStopMonitoringResponse
+from models.OpenData511 import TransitStopMonitoringResponse, TransitTripUpdatesResponse
 from modules.logger import logger
 
 
@@ -38,7 +38,11 @@ class OpenData511Client:
     ) -> httpx.Response:
         response = self._client.request(method, path, params=params, json=json_payload)
         # log text, not .json(): non-JSON error bodies would raise here and mask the real status code
-        logger.debug(f"Response body: {response.text}")
+        # protobuf bodies are binary and can be close to a megabyte, so only their size is logged
+        if response.headers.get("content-type", "").startswith("application/x-google-protobuf"):
+            logger.debug(f"Response body: {len(response.content)} bytes of protobuf")
+        else:
+            logger.debug(f"Response body: {response.text}")
         if response.status_code == 401:
             raise httpx.HTTPStatusError(
                 "401 Unauthorized: OpenData511 api key is missing or invalid",
@@ -65,3 +69,14 @@ class OpenData511Client:
             },
         )
         return TransitStopMonitoringResponse.model_validate(response.json())
+
+    def get_transit_trip_updates(self, agency: str):
+        # only served as protobuf, and covers every trip of the agency since there is no stopcode filter
+        response = self._authenticated_request(
+            "get",
+            "/transit/tripupdates",
+            params={
+                "agency": agency,
+            },
+        )
+        return TransitTripUpdatesResponse(response.content)
