@@ -17,7 +17,7 @@ OPEN_DATA_511_API_KEY_1=""
 ```
 Get an API key here - https://511.org/open-data/token
 
-OpenData511 is not responding to requests for rate limit increases, meaning if you want to monitor more than one stop per minute you must use additional API keys. Please use this responsibly and do not abuse their API.
+OpenData511 is not responding to requests for rate limit increases, meaning if you want to refresh more than once per minute you must use additional API keys. Please use this responsibly and do not abuse their API.
 
 Only `OPEN_DATA_511_API_KEY_0` is required. Any number of additional keys can be provided as `OPEN_DATA_511_API_KEY_1`, `OPEN_DATA_511_API_KEY_2`, and so on, with each key adding another 60 requests per hour to the program's effective rate limit. Keys must be numbered consecutively starting from 0. Ingestion stops at the first missing (or empty) key, so any keys after a gap are ignored.
 
@@ -34,6 +34,8 @@ Your transit agency's agency ID can be found by visiting the following url: `htt
 OPEN_DATA_511_STOPCODES="<stopcode-0>,<stopcode-1>"
 ```
 Comma-delimited list of stopcodes to monitor. These are the unique ids assigned to transit stops by a transit agency and should be accessible via your transit agencies website. Alternatively, visit the following URL and search for `StopPointRef` in the returned XML document: `https://api.511.org/transit/StopMonitoring?api_key=<your-api-key>&agency=<your-agency-id>`
+
+Arrivals come from the OpenData511 trip updates API, which predicts every upcoming stop of every trip the agency is running, often an hour or two ahead. Stopcodes are matched to its stop ids and lines to its route ids, which are the same as the stopcodes and line references for Muni (agency `SF`).
 
 ### LED Matrix variables
 These are all values inherent to `rpi-rgb-led-matrix`. See the linked documentation for how they should be configured.
@@ -70,12 +72,14 @@ REFRESH_API_INTERVAL_SECONDS="62"
 ```
 How often new data is fetched from the OpenData511 API. Recommended default of 62 to be just above default rate limit of 60 requests per hour.
 
-All stopcodes are checked every `REFRESH_API_INTERVAL_SECONDS`, each requiring their own request, so the minimum `REFRESH_API_INTERVAL_SECONDS` can be calculated to be:
+All stopcodes are checked every `REFRESH_API_INTERVAL_SECONDS` with a single trip updates request, so the minimum `REFRESH_API_INTERVAL_SECONDS` can be calculated to be:
 ```
-(number of comma-delimited OPEN_DATA_511_STOPCODES * 60) / number of API keys provided
+60 / number of API keys provided
 ```
 
 It is recommended to set `REFRESH_API_INTERVAL_SECONDS` slightly higher than the calculated value to avoid running into the rate-limit.
+
+The trip updates response covers every trip of the agency and is not compressed: for Muni it is about 850 KB per request, roughly 1.2 GB per day at a 62 second refresh interval.
 
 #### REFRESH_DISPLAY_INTERVAL_SECONDS
 ```

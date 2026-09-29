@@ -502,21 +502,23 @@ def display_loop():
             os._exit(1)
 
 
-def fetch_stop_display_info(client: OpenData511Client, stopcode: str):
-    """Fetches a stop's monitoring data, returning None on request failure so other stops are unaffected"""
+def fetch_display_info_dict(client: OpenData511Client) -> dict[str, DisplayInfoModel]:
+    """Fetches every stop's upcoming visits from the agency's trip updates, returning an empty dict on request
+    failure so the previously fetched data stays displayed"""
     try:
-        return client.get_transit_stop_monitoring(env.OPEN_DATA_511_AGENCY_ID, stopcode).convert_to_display_info()
+        trip_updates = client.get_transit_trip_updates(env.OPEN_DATA_511_AGENCY_ID)
+        return trip_updates.convert_to_display_info_dict(env.OPEN_DATA_511_STOPCODE_LIST)
     except HTTPStatusError as err:
         # fail program on 401; an unhandled raise would only kill this thread and leave the display
         # running with stale data forever
         if err.response.status_code == 401:
-            logger.error(f"API key rejected for stopcode {stopcode}: 401 {err.response.text}")
+            logger.error(f"API key rejected for trip updates: 401 {err.response.text}")
             os._exit(1)
-        logger.error(f"API Request Failed for stopcode {stopcode}: {err.response.status_code} {err.response.text}")
+        logger.error(f"API Request Failed for trip updates: {err.response.status_code} {err.response.text}")
     except Exception:
         # catch all other errors as the OpenData511 API is fickle and I don't wanna play error whack-a-mole
         logger.error("Unexpected exception while trying to fetch stop data...continuing", exc_info=True)
-    return None
+    return {}
 
 
 def refresh_sunrise_sunset_result(sunrise_sunset_client: SunriseSunsetClient):
@@ -555,14 +557,8 @@ def api_loop():
         sunrise_sunset_client = SunriseSunsetClient()
 
     while True:
-        # utilizing a dict to isolate each stopcode so that request failures only impact the given requested stop
-        # and not all data for all stops
-        display_info_dict_staged: dict[str, DisplayInfoModel] = {}
-
-        for stopcode in env.OPEN_DATA_511_STOPCODE_LIST:
-            display_info = fetch_stop_display_info(client_list[client_idx], stopcode)
-            if display_info is not None:
-                display_info_dict_staged[stopcode] = display_info
+        # one trip updates request covers every stopcode
+        display_info_dict_staged = fetch_display_info_dict(client_list[client_idx])
 
         with display_info_lock:
             # NOTE: only want to overwrite stops for data we have fetched in case one of the API requests fails

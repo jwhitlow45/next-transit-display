@@ -1,10 +1,10 @@
 from http import HTTPMethod
-from typing import Any, Literal
+from typing import Any
 
 import httpx
 from httpx_retries import Retry, RetryTransport
 
-from models.OpenData511 import TransitStopMonitoringResponse, TransitTripUpdatesResponse
+from models.OpenData511 import TransitTripUpdatesResponse
 from modules.logger import logger
 
 
@@ -52,23 +52,6 @@ class OpenData511Client:
         else:
             response.raise_for_status()
         return response
-
-    def get_transit_stop_monitoring(
-        self,
-        agency: str,
-        stopcode: str | int | None = None,
-        format: Literal["json", "xml"] = "json",
-    ):
-        response = self._authenticated_request(
-            "get",
-            "/transit/StopMonitoring",
-            params={
-                "agency": agency,
-                "stopcode": stopcode,
-                "format": format,
-            },
-        )
-        return TransitStopMonitoringResponse.model_validate(response.json())
 
     def get_transit_trip_updates(self, agency: str):
         # only served as protobuf, and covers every trip of the agency since there is no stopcode filter
