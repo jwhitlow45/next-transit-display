@@ -87,6 +87,11 @@ if _LINE_COLORS:
 LINE_REFERENCE_ORDER = os.getenv("LINE_REFERENCE_ORDER") or ""
 FUTURE_STOP_VISITS_SHOWN = int(os.getenv("FUTURE_STOP_VISITS_SHOWN") or -1)
 ENABLE_DEPARTURE_ANIMATION = int(os.getenv("ENABLE_DEPARTURE_ANIMATION") or 1)
+# sprites of the departure animation convoy listed from the leading sprite back, valued as sprite names which
+# are validated against the sprites in departure_animation to avoid a circular import here
+_DEPARTURE_ANIMATION_SPRITES = os.getenv("DEPARTURE_ANIMATION_SPRITES") or "BUS,STREETCAR,SUBWAY_CAR"
+# stripped so a space after a comma doesn't fail validation and leave the display dark
+DEPARTURE_ANIMATION_SPRITE_LIST = [sprite_name.strip() for sprite_name in _DEPARTURE_ANIMATION_SPRITES.split(",")]
 FONT = os.getenv("FONT") or ""
 # FONT name should contain "<width>x<height>" (e.g. "5x7.bdf", "clR6x12.bdf") so this gets font width for alignment
 _FONT_DIMENSIONS_MATCH = re.search(r"(\d+)x(\d+)", FONT)

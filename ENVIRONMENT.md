@@ -197,7 +197,7 @@ Example output:
 ```
 LINE_ANIMATION_DIRECTIONS=""
 ```
-Optional comma-separated list of departure animation directions with each entry corresponding to the same position in LINE_REFERENCES and LINE_STOPCODES. `R` drives the animation left to right and `L` drives it right to left, letting the animation match each line's real direction of travel. The bus always leads the convoy in its direction of travel.
+Optional comma-separated list of departure animation directions with each entry corresponding to the same position in LINE_REFERENCES and LINE_STOPCODES. `R` drives the animation left to right and `L` drives it right to left, letting the animation match each line's real direction of travel. The first sprite in DEPARTURE_ANIMATION_SPRITES always leads the convoy in its direction of travel.
 
 If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) the animation drives left to right. See ENABLE_DEPARTURE_ANIMATION for the animation itself.
 
@@ -243,7 +243,21 @@ How many future stop visits should be shown per line on the display
 ```
 ENABLE_DEPARTURE_ANIMATION="<0|1>"
 ```
-Enables an animation played when a line's displayed arrival time reaches 0: the row fades out, then a convoy of transit vehicles drives through it towing the row's remaining arrival times into place behind it. Defaults to 1 (enabled).
+Enables an animation played when a line's displayed arrival time reaches 0: the row fades out, then a convoy of vehicles (see DEPARTURE_ANIMATION_SPRITES) drives through it towing the row's remaining arrival times into place behind it. Defaults to 1 (enabled).
+
+#### DEPARTURE_ANIMATION_SPRITES
+```
+DEPARTURE_ANIMATION_SPRITES=""
+```
+Optional comma-separated list of the sprites making up the departure animation's convoy, listed from the leading sprite back. The same convoy drives across the loading screen while the first stop data is fetched. Sprites can be repeated. Defaults to `BUS,STREETCAR,SUBWAY_CAR`.
+
+Valid sprite names:
+```
+BUS STREETCAR SUBWAY_CAR
+```
+Names are case sensitive. Spaces around them are ignored. An unknown name stops the display at startup with an error listing the valid names.
+
+Every pass of the animation takes the same amount of time, so longer convoys drive faster.
 
 #### Departure pulse configuration (optional)
 ```

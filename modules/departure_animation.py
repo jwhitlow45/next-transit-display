@@ -3,6 +3,7 @@ from enum import StrEnum
 from time import monotonic, sleep
 
 from modules.display_utils import Colors
+from modules.environment import DEPARTURE_ANIMATION_SPRITE_LIST
 
 _TRAVEL_DURATION_SECONDS = 2.0
 _ENTRY_EXIT_BUFFER_SECONDS = 0.5  # row fade-out before the convoy enters, settle time after it exits
@@ -66,9 +67,27 @@ _SUBWAY_CAR_SPRITE = [
     "..KK........KK..",
 ]
 
-# sprites are drawn facing right and drive left to right with the bus leading, so it sits rightmost
-_CONVOY_LEFT_TO_RIGHT = [_SUBWAY_CAR_SPRITE, _STREETCAR_SPRITE, _BUS_SPRITE]
-# mirror the sprites and reverse their order so the bus still leads when driving right to left
+# these keys are the names DEPARTURE_ANIMATION_SPRITES accepts, keep ENVIRONMENT.md's list of valid sprite
+# names in sync
+_SPRITES_BY_NAME = {
+    "BUS": _BUS_SPRITE,
+    "STREETCAR": _STREETCAR_SPRITE,
+    "SUBWAY_CAR": _SUBWAY_CAR_SPRITE,
+}
+
+# fail fast at startup on configured sprite names which don't name a sprite above, environment.py cannot
+# validate these itself without a circular import
+for _sprite_name in DEPARTURE_ANIMATION_SPRITE_LIST:
+    if _sprite_name not in _SPRITES_BY_NAME:
+        raise ValueError(
+            f"Environment variable DEPARTURE_ANIMATION_SPRITES entry '{_sprite_name}' is not a valid sprite name, "
+            f"valid names are {','.join(_SPRITES_BY_NAME)}"
+        )
+
+# sprites are drawn facing right and drive left to right with the first configured sprite leading, so it
+# sits rightmost
+_CONVOY_LEFT_TO_RIGHT = [_SPRITES_BY_NAME[sprite_name] for sprite_name in reversed(DEPARTURE_ANIMATION_SPRITE_LIST)]
+# mirror the sprites and reverse their order so the leading sprite still leads when driving right to left
 _CONVOY_RIGHT_TO_LEFT = [[row[::-1] for row in sprite] for sprite in reversed(_CONVOY_LEFT_TO_RIGHT)]
 _CONVOY_BY_DIRECTION = {
     AnimationDirection.LEFT_TO_RIGHT: _CONVOY_LEFT_TO_RIGHT,
