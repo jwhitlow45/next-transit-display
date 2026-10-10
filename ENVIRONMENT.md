@@ -253,11 +253,18 @@ Optional comma-separated list of the sprites making up the departure animation's
 
 Valid sprite names:
 ```
-BUS STREETCAR SUBWAY_CAR
+BUS STREETCAR SUBWAY_CAR GHOST_BUS PUMPKIN_COACH HEARSE BAT
 ```
 Names are case sensitive. Spaces around them are ignored. An unknown name stops the display at startup with an error listing the valid names.
 
+`GHOST_BUS`, `PUMPKIN_COACH`, `HEARSE`, and `BAT` are Halloween themed. The bat flies above the road line rather than driving along it.
+
 Every pass of the animation takes the same amount of time, so longer convoys drive faster.
+
+Example Halloween convoy with a bat flying out in front of a hearse towing the rest:
+```
+DEPARTURE_ANIMATION_SPRITES="BAT,HEARSE,PUMPKIN_COACH,GHOST_BUS"
+```
 
 #### Departure pulse configuration (optional)
 ```

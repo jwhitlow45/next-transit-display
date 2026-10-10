@@ -29,6 +29,10 @@ _SPRITE_COLOR_LEGEND = {
     "K": Colors.GRAY,
     "D": (70, 70, 70),  # dark window glass, not part of Colors as it is too dim for text
     "W": Colors.WHITE,
+    # a deep orange keeps a pumpkin's yellow carved face looking lit from inside. COLOR_LUMINANCE_CAP pulls
+    # yellow down to the brightness of brighter oranges, so only a dimmer orange stays darker than the face
+    "O": Colors.MUNI_LESS,
+    "P": Colors.PURPLE,
 }
 
 # NOTE: sprites are 7 pixels tall to fill one row of a 7 pixel tall font, taller fonts leave headroom
@@ -67,12 +71,62 @@ _SUBWAY_CAR_SPRITE = [
     "..KK........KK..",
 ]
 
+# halloween ghost bus: a white sheet in the shape of a bus with hollow windows, a wavy hem where its
+# wheels should be, and an eerie green headlight
+_GHOST_BUS_SPRITE = [
+    "..WWWWWWWWWW..",
+    ".WWWWWWWWWWWW.",
+    ".W..W..W..W.W.",
+    ".W..W..W..W.W.",
+    ".WWWWWWWWWWWG.",
+    ".WWWWWWWWWWWW.",
+    ".W.WW.WW.WW.W.",
+]
+
+# halloween pumpkin coach: a jack-o'-lantern on wheels with a lit carved face and a green stem
+_PUMPKIN_COACH_SPRITE = [
+    ".......GG.......",
+    "..OOOOOOOOOOOO..",
+    ".OOOYYOOOOYYOOO.",
+    ".OOOOOOOOOOOOOO.",
+    ".OOYYOYYYYOYYOO.",
+    "..OOOOOOOOOOOO..",
+    "..KK........KK..",
+]
+
+# halloween hearse: purple, as black pixels are just unlit LEDs. hollow windows, a silver landau bar on
+# the rear quarter, and a long hood out front
+_HEARSE_SPRITE = [
+    ".PPPPPPPPPPP......",
+    ".PPP....P...PP....",
+    ".PSP....P...PPP...",
+    ".PPPPPPPPPPPPPPPP.",
+    ".PPPPPPPPPPPPPPPY.",
+    "..PPPPPPPPPPPPPP..",
+    "...KK.......KK....",
+]
+
+# halloween bat: red eyes, bottom rows left transparent so it flies above the road line
+_BAT_SPRITE = [
+    "P..P.P..P",
+    "PP.RPR.PP",
+    "PPPPPPPPP",
+    ".P..P..P.",
+    ".........",
+    ".........",
+    ".........",
+]
+
 # these keys are the names DEPARTURE_ANIMATION_SPRITES accepts, keep ENVIRONMENT.md's list of valid sprite
 # names in sync
 _SPRITES_BY_NAME = {
     "BUS": _BUS_SPRITE,
     "STREETCAR": _STREETCAR_SPRITE,
     "SUBWAY_CAR": _SUBWAY_CAR_SPRITE,
+    "GHOST_BUS": _GHOST_BUS_SPRITE,
+    "PUMPKIN_COACH": _PUMPKIN_COACH_SPRITE,
+    "HEARSE": _HEARSE_SPRITE,
+    "BAT": _BAT_SPRITE,
 }
 
 # fail fast at startup on configured sprite names which don't name a sprite above, environment.py cannot
