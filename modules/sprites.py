@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
 
-from modules.display_utils import Colors
+from modules.display_utils import Colors, cap_if_enabled
 
 _VEHICLE_GAP_PIXELS = 6
 # one row of a 7 pixel tall font, see the NOTE above the sprites
@@ -14,7 +14,9 @@ class AnimationDirection(StrEnum):
     RIGHT_TO_LEFT = "L"
 
 
-# "." pixels are transparent, every other character is drawn with its legend color
+# "." pixels are transparent, every other character is drawn with its legend color. Colors entries are
+# capped once when display_utils is imported, and capping a capped color again can shift a channel by one
+# through rounding, so only the raw colors defined here go through cap_if_enabled
 SPRITE_COLOR_LEGEND = {
     "R": Colors.RED,
     "S": Colors.SILVER,
@@ -23,7 +25,7 @@ SPRITE_COLOR_LEGEND = {
     "C": Colors.CREAM,
     "B": Colors.BLUE,
     "K": Colors.GRAY,
-    "D": (70, 70, 70),  # dark window glass, not part of Colors as it is too dim for text
+    "D": cap_if_enabled((70, 70, 70)),  # dark window glass, not part of Colors as it is too dim for text
     "W": Colors.WHITE,
     # a deep orange keeps a pumpkin's yellow carved face looking lit from inside. COLOR_LUMINANCE_CAP pulls
     # yellow down to the brightness of brighter oranges, so only a dimmer orange stays darker than the face
