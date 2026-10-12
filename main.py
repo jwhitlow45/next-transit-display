@@ -14,7 +14,6 @@ from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from models.SunriseSunset import SunriseSunsetResult
 from modules.departure_animation import (
     DEPARTURE_ANIMATION_DURATION_SECONDS,
-    AnimationDirection,
     DepartureAnimationRow,
     play_departure_animation,
     play_loading_animation,
@@ -31,6 +30,7 @@ from modules.display_utils import (
 from modules.logger import logger
 from modules.rgbmatrix_configurer import get_rgb_matrix
 from modules.rgbmatrix_importer import get_rgb_matrix_imports
+from modules.sprites import AnimationDirection
 from services.OpenData511 import OpenData511Client
 from services.SunriseSunset import SunriseSunsetClient
 

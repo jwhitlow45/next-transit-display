@@ -1,170 +1,24 @@
 from dataclasses import dataclass, field
-from enum import StrEnum
 from time import monotonic, sleep
 
-from modules.display_utils import Colors
 from modules.environment import DEPARTURE_ANIMATION_SPRITE_LIST
+from modules.sprites import SPRITE_COLOR_LEGEND, SPRITES_BY_NAME, AnimationDirection, Convoy, build_convoy, draw_convoy
 
 _TRAVEL_DURATION_SECONDS = 2.0
 _ENTRY_EXIT_BUFFER_SECONDS = 0.5  # row fade-out before the convoy enters, settle time after it exits
 DEPARTURE_ANIMATION_DURATION_SECONDS = _TRAVEL_DURATION_SECONDS + 2 * _ENTRY_EXIT_BUFFER_SECONDS
 _FRAMES_PER_SECOND = 30
-_VEHICLE_GAP_PIXELS = 6
 _TOW_GAP_PIXELS = 5  # gap between the last vehicle and the row contents it tows
 
-
-class AnimationDirection(StrEnum):
-    LEFT_TO_RIGHT = "R"
-    RIGHT_TO_LEFT = "L"
-
-
-# "." pixels are transparent, every other character is drawn with its legend color
-_SPRITE_COLOR_LEGEND = {
-    "R": Colors.RED,
-    "S": Colors.SILVER,
-    "Y": Colors.YELLOW,
-    "G": Colors.GREEN,
-    "C": Colors.CREAM,
-    "B": Colors.BLUE,
-    "K": Colors.GRAY,
-    "D": (70, 70, 70),  # dark window glass, not part of Colors as it is too dim for text
-    "W": Colors.WHITE,
-    # a deep orange keeps a pumpkin's yellow carved face looking lit from inside. COLOR_LUMINANCE_CAP pulls
-    # yellow down to the brightness of brighter oranges, so only a dimmer orange stays darker than the face
-    "O": Colors.MUNI_LESS,
-    "P": Colors.PURPLE,
-}
-
-# NOTE: sprites are 7 pixels tall to fill one row of a 7 pixel tall font, taller fonts leave headroom
-# in the row while shorter fonts will have the convoy spill into neighboring rows
-
-# muni-style bus: silver with a red band, lit windows, headlight up front
-_BUS_SPRITE = [
-    ".RRRRRRRRRRRR.",
-    ".SSSSSSSSSSSS.",
-    ".SYYSYYSYYSYS.",
-    ".SYYSYYSYYSYS.",
-    ".RRRRRRRRRRRW.",
-    ".SSSSSSSSSSSS.",
-    "..KK......KK..",
-]
-
-# f-line-style streetcar: green over cream with lit windows
-_STREETCAR_SPRITE = [
-    "..GGGGGGGGGGGG..",
-    ".GGGGGGGGGGGGGG.",
-    ".GYYGYYGYYGYYGG.",
-    ".GYYGYYGYYGYYGG.",
-    ".CCCCCCCCCCCCCC.",
-    ".GGGGGGGGGGGGGG.",
-    "..KK........KK..",
-]
-
-# bart-style subway car: silver with dark windows and a blue stripe
-_SUBWAY_CAR_SPRITE = [
-    "..SSSSSSSSSSSS..",
-    ".SSSSSSSSSSSSSS.",
-    ".SDDSSDDSSDDSSS.",
-    ".SBBBBBBBBBBBBS.",
-    ".SSSSSSSSSSSSSS.",
-    ".SSSSSSSSSSSSSS.",
-    "..KK........KK..",
-]
-
-# halloween ghost bus: a white sheet in the shape of a bus with hollow windows, a wavy hem where its
-# wheels should be, and an eerie green headlight
-_GHOST_BUS_SPRITE = [
-    "..WWWWWWWWWW..",
-    ".WWWWWWWWWWWW.",
-    ".W..W..W..W.W.",
-    ".W..W..W..W.W.",
-    ".WWWWWWWWWWWG.",
-    ".WWWWWWWWWWWW.",
-    ".W.WW.WW.WW.W.",
-]
-
-# halloween pumpkin coach: a jack-o'-lantern on wheels with a lit carved face and a green stem
-_PUMPKIN_COACH_SPRITE = [
-    ".......GG.......",
-    "..OOOOOOOOOOOO..",
-    ".OOOYYOOOOYYOOO.",
-    ".OOOOOOOOOOOOOO.",
-    ".OOYYOYYYYOYYOO.",
-    "..OOOOOOOOOOOO..",
-    "..KK........KK..",
-]
-
-# halloween hearse: purple, as black pixels are just unlit LEDs. hollow windows, a silver landau bar on
-# the rear quarter, and a long hood out front
-_HEARSE_SPRITE = [
-    ".PPPPPPPPPPP......",
-    ".PPP....P...PP....",
-    ".PSP....P...PPP...",
-    ".PPPPPPPPPPPPPPPP.",
-    ".PPPPPPPPPPPPPPPY.",
-    "..PPPPPPPPPPPPPP..",
-    "...KK.......KK....",
-]
-
-# halloween bat: red eyes, bottom rows left transparent so it flies above the road line
-_BAT_SPRITE = [
-    "P..P.P..P",
-    "PP.RPR.PP",
-    "PPPPPPPPP",
-    ".P..P..P.",
-    ".........",
-    ".........",
-    ".........",
-]
-
-# these keys are the names DEPARTURE_ANIMATION_SPRITES accepts, keep ENVIRONMENT.md's list of valid sprite
-# names in sync
-_SPRITES_BY_NAME = {
-    "BUS": _BUS_SPRITE,
-    "STREETCAR": _STREETCAR_SPRITE,
-    "SUBWAY_CAR": _SUBWAY_CAR_SPRITE,
-    "GHOST_BUS": _GHOST_BUS_SPRITE,
-    "PUMPKIN_COACH": _PUMPKIN_COACH_SPRITE,
-    "HEARSE": _HEARSE_SPRITE,
-    "BAT": _BAT_SPRITE,
-}
-
-# fail fast at startup on configured sprite names which don't name a sprite above, environment.py cannot
+# fail fast at startup on configured sprite names which don't name a sprite, environment.py cannot
 # validate these itself without a circular import
 for _sprite_name in DEPARTURE_ANIMATION_SPRITE_LIST:
-    if _sprite_name not in _SPRITES_BY_NAME:
+    if _sprite_name not in SPRITES_BY_NAME:
         raise ValueError(
             f"Environment variable DEPARTURE_ANIMATION_SPRITES entry '{_sprite_name}' is not a valid sprite name, "
-            f"valid names are {','.join(_SPRITES_BY_NAME)}"
+            f"valid names are {','.join(SPRITES_BY_NAME)}"
         )
-
-# sprites are drawn facing right and drive left to right with the first configured sprite leading, so it
-# sits rightmost
-_CONVOY_LEFT_TO_RIGHT = [_SPRITES_BY_NAME[sprite_name] for sprite_name in reversed(DEPARTURE_ANIMATION_SPRITE_LIST)]
-# mirror the sprites and reverse their order so the leading sprite still leads when driving right to left
-_CONVOY_RIGHT_TO_LEFT = [[row[::-1] for row in sprite] for sprite in reversed(_CONVOY_LEFT_TO_RIGHT)]
-_CONVOY_BY_DIRECTION = {
-    AnimationDirection.LEFT_TO_RIGHT: _CONVOY_LEFT_TO_RIGHT,
-    AnimationDirection.RIGHT_TO_LEFT: _CONVOY_RIGHT_TO_LEFT,
-}
-_CONVOY_WIDTH = sum(max(len(row) for row in sprite) for sprite in _CONVOY_LEFT_TO_RIGHT) + _VEHICLE_GAP_PIXELS * (
-    len(_CONVOY_LEFT_TO_RIGHT) - 1
-)
-
-
-def _get_convoy_x_offsets(convoy: list[list[str]]):
-    """Calculates the x offset of each vehicle in a convoy relative to the convoy's left edge"""
-    x_offsets: list[int] = []
-    next_x_offset = 0
-    for sprite in convoy:
-        x_offsets.append(next_x_offset)
-        next_x_offset += max(len(row) for row in sprite) + _VEHICLE_GAP_PIXELS
-    return x_offsets
-
-
-_CONVOY_X_OFFSETS_BY_DIRECTION = {
-    direction: _get_convoy_x_offsets(convoy) for direction, convoy in _CONVOY_BY_DIRECTION.items()
-}
+_DEPARTURE_SPRITE_NAMES = tuple(DEPARTURE_ANIMATION_SPRITE_LIST)
 
 
 @dataclass
@@ -186,50 +40,32 @@ class DepartureAnimationRow:
     towed_right_x: int = 0
 
 
-def _draw_sprite(canvas, sprite: list[str], x_pos: int, y_pos: int):
-    """Draws a sprite onto a canvas with its top-left corner at (x_pos, y_pos)
-
-    Args:
-        canvas: canvas to draw the sprite onto, out of bounds pixels are clipped by SetPixel
-        sprite (list[str]): rows of sprite characters, see _SPRITE_COLOR_LEGEND
-        x_pos (int): x position of the top-left corner of the sprite
-        y_pos (int): y position of the top-left corner of the sprite
-    """
-    for y_offset, row in enumerate(sprite):
-        for x_offset, char in enumerate(row):
-            if char != ".":
-                canvas.SetPixel(x_pos + x_offset, y_pos + y_offset, *_SPRITE_COLOR_LEGEND[char])
-
-
-def _draw_convoy_towing_row(canvas, animation_row: DepartureAnimationRow, row_height: int, display_width: int, travel_percent: float, draw_segments):
+def _draw_convoy_towing_row(canvas, animation_row: DepartureAnimationRow, convoy: Convoy, row_height: int, display_width: int, travel_percent: float, draw_segments):
     """Draws one row's convoy at its position along its travel with the row's towed contents behind it"""
     # travel from fully off-screen to far enough past the other edge that the towed contents, which
     # trail behind the convoy and stop at their resting positions, are fully towed into place
     if animation_row.direction == AnimationDirection.LEFT_TO_RIGHT:
         convoy_end_x_pos = max(display_width, animation_row.towed_right_x + _TOW_GAP_PIXELS)
-        convoy_x_pos = -_CONVOY_WIDTH + int((convoy_end_x_pos + _CONVOY_WIDTH) * travel_percent)
+        convoy_x_pos = -convoy.width + int((convoy_end_x_pos + convoy.width) * travel_percent)
         tow_x_offset = min(convoy_x_pos - _TOW_GAP_PIXELS - animation_row.towed_right_x, 0)
         rope_x_range = range(animation_row.towed_right_x + tow_x_offset, convoy_x_pos)
         still_towing = tow_x_offset < 0
     else:
-        convoy_end_x_pos = min(-_CONVOY_WIDTH, animation_row.towed_left_x - _TOW_GAP_PIXELS - _CONVOY_WIDTH)
+        convoy_end_x_pos = min(-convoy.width, animation_row.towed_left_x - _TOW_GAP_PIXELS - convoy.width)
         convoy_x_pos = display_width - int((display_width - convoy_end_x_pos) * travel_percent)
-        tow_x_offset = max(convoy_x_pos + _CONVOY_WIDTH + _TOW_GAP_PIXELS - animation_row.towed_left_x, 0)
-        rope_x_range = range(convoy_x_pos + _CONVOY_WIDTH, animation_row.towed_left_x + tow_x_offset)
+        tow_x_offset = max(convoy_x_pos + convoy.width + _TOW_GAP_PIXELS - animation_row.towed_left_x, 0)
+        rope_x_range = range(convoy_x_pos + convoy.width, animation_row.towed_left_x + tow_x_offset)
         still_towing = tow_x_offset > 0
 
     # vehicles ride along the bottom of the row so all wheels share a common road line
-    road_y_pos = animation_row.row_y_pos + row_height
-    convoy = _CONVOY_BY_DIRECTION[animation_row.direction]
-    for sprite, sprite_x_offset in zip(convoy, _CONVOY_X_OFFSETS_BY_DIRECTION[animation_row.direction]):
-        _draw_sprite(canvas, sprite, convoy_x_pos + sprite_x_offset, road_y_pos - len(sprite))
+    draw_convoy(canvas, convoy, convoy_x_pos, animation_row.row_y_pos + row_height)
 
     draw_segments(canvas, animation_row.towed_segments, 1.0, tow_x_offset)
     if still_towing and animation_row.towed_segments:
         # a small tow rope between the last vehicle and the row contents it is towing
         rope_y_pos = animation_row.row_y_pos + (row_height // 2)
         for rope_x_pos in rope_x_range:
-            canvas.SetPixel(rope_x_pos, rope_y_pos, *_SPRITE_COLOR_LEGEND["K"])
+            canvas.SetPixel(rope_x_pos, rope_y_pos, *SPRITE_COLOR_LEGEND["K"])
 
 
 def play_loading_animation(matrix, canvas, display_width: int, display_height: int):
@@ -246,7 +82,7 @@ def play_loading_animation(matrix, canvas, display_width: int, display_height: i
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
     """
-    row_height = max(len(sprite) for sprite in _CONVOY_LEFT_TO_RIGHT)
+    row_height = build_convoy(_DEPARTURE_SPRITE_NAMES, AnimationDirection.LEFT_TO_RIGHT).height
     row_y_pos = (display_height - row_height) // 2
     return play_departure_animation(
         matrix,
@@ -294,7 +130,8 @@ def play_departure_animation(matrix, canvas, display_width: int, animation_row_l
                 draw_segments(canvas, animation_row.fading_segments, fade_brightness_percent, 0)
         else:
             for animation_row in animation_row_list:
-                _draw_convoy_towing_row(canvas, animation_row, row_height, display_width, travel_percent, draw_segments)
+                convoy = build_convoy(_DEPARTURE_SPRITE_NAMES, animation_row.direction)
+                _draw_convoy_towing_row(canvas, animation_row, convoy, row_height, display_width, travel_percent, draw_segments)
         canvas = matrix.SwapOnVSync(canvas)
 
         sleep(1 / _FRAMES_PER_SECOND)
