@@ -298,6 +298,8 @@ FONT="5x7.bdf"
 ```
 Font of the display, see `fonts/` directory
 
+Event animation banners (see the animation listener section) always use `5x7.bdf`, whatever this is set to, so their timing holds.
+
 #### FONT_COLOR
 ```
 COLOR="<color-string>"
@@ -371,6 +373,43 @@ Number of seconds after/before sunrise/sunset that full daylight starts/ends. Th
 LED_MATRIX_MIN_BRIGHTNESS="<int>"
 ```
 Minimum brightness for time-based brightness configuration. This will be the brightness value the display trends towards as it gets darker. Once it is estimated to be fully dark based on the provided GPS coordinates this will be the brightness value used by the display. Defaults to `LED_MATRIX_MAX_BRIGHTNESS` if not set.
+
+### Animation listener variables
+These let other programs play short animations on the display by publishing to an MQTT broker, for example Home Assistant's `mqtt.publish` service, `mosquitto_pub`, or a bridge that turns Minecraft events into animations. The display only connects out to the broker, it never opens a port of its own. All of these are optional while the listener is disabled.
+
+#### ENABLE_ANIMATION_LISTENER
+```
+ENABLE_ANIMATION_LISTENER="<0|1>"
+```
+Enables the listener. Defaults to 0 (disabled), and a display with it disabled behaves exactly as it does without the feature. When it is 1, `ANIMATION_MQTT_HOST`, `ANIMATION_MQTT_USERNAME`, and `ANIMATION_MQTT_PASSWORD` are required, and `paho-mqtt` must be installed (see the setup script).
+
+#### ANIMATION_MQTT_HOST, ANIMATION_MQTT_PORT, ANIMATION_MQTT_USERNAME, ANIMATION_MQTT_PASSWORD
+```
+ANIMATION_MQTT_HOST="<broker-host>"
+ANIMATION_MQTT_PORT=""
+ANIMATION_MQTT_USERNAME="<broker-username>"
+ANIMATION_MQTT_PASSWORD="<broker-password>"
+```
+The broker to listen on and the login to use. `ANIMATION_MQTT_PORT` defaults to 1883. A broker that is down when the display starts never stops the transit view: the display keeps reconnecting in the background.
+
+#### Publishing an animation
+Publish to `transit-display/animations/play` with QoS 0 and without retain, as UTF-8 JSON of at most 4 KiB:
+```
+{"v": 1, "animation": "convoy", "params": {"sprites": ["CHICKEN_JOCKEY", "PIG", "COW", "CREEPER"], "direction": "R"}}
+```
+| Animation | Params | Duration |
+|:---|:---|:---|
+| `convoy` | `sprites`: 1 to 6 sprite names from DEPARTURE_ANIMATION_SPRITES, leading sprite first. `direction`: `"R"` (default) or `"L"` | 3 s |
+| `flash` | `colors`: 1 to 20 `[r, g, b]` triples of integers 0 to 255. `step_ms`: 500 to 2000, default 700. `repeats`: 1 to 4, default 1 | colors × step_ms × repeats |
+| `banner` | `text`: 1 to 47 printable ASCII characters. `color`: `[r, g, b]`, default white | (64 + 5 × characters) ÷ 30 s |
+
+Every animation takes over the whole panel, then the transit view comes back. A request longer than 10 seconds, or one that breaks any of the rules above, is dropped and logged rather than cut short, with rejections logged at most once a minute.
+
+Animations wait their turn: at most 3 wait at once (a fourth drops the oldest), an identical request already waiting is ignored, and a request that hasn't started within 15 seconds is dropped. One never starts if it would still be playing when the next displayed arrival begins its departure pulse, so departures always get their animation. It waits until after the departure instead, or expires.
+
+`flash` fills the whole panel, so its colors are dimmed until their brightest channel is at most 60 to protect the power supply the panel shares with the Pi. It changes color at most twice a second.
+
+The display publishes `online` to `transit-display/status` (retained) when it connects, and the broker publishes `offline` there when the display goes away.
 
 ### Development
 #### LOG_LEVEL

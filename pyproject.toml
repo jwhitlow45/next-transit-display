@@ -9,6 +9,7 @@ dependencies = [
     "gtfs-realtime-bindings>=3.0.0",
     "httpx>=0.28.1",
     "httpx-retries>=0.4.2",
+    "paho-mqtt>=2,<3",
     "pydantic>=2.11.7",
 ]
 

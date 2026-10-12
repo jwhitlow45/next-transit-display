@@ -92,6 +92,22 @@ ENABLE_DEPARTURE_ANIMATION = int(os.getenv("ENABLE_DEPARTURE_ANIMATION") or 1)
 _DEPARTURE_ANIMATION_SPRITES = os.getenv("DEPARTURE_ANIMATION_SPRITES") or "BUS,STREETCAR,SUBWAY_CAR"
 # stripped so a space after a comma doesn't fail validation and leave the display dark
 DEPARTURE_ANIMATION_SPRITE_LIST = [sprite_name.strip() for sprite_name in _DEPARTURE_ANIMATION_SPRITES.split(",")]
+
+# optional listener that plays animations published over MQTT, off unless enabled
+ENABLE_ANIMATION_LISTENER = int(os.getenv("ENABLE_ANIMATION_LISTENER") or 0)
+ANIMATION_MQTT_HOST = os.getenv("ANIMATION_MQTT_HOST") or ""
+ANIMATION_MQTT_PORT = int(os.getenv("ANIMATION_MQTT_PORT") or 1883)
+ANIMATION_MQTT_USERNAME = os.getenv("ANIMATION_MQTT_USERNAME") or ""
+ANIMATION_MQTT_PASSWORD = os.getenv("ANIMATION_MQTT_PASSWORD") or ""
+if ENABLE_ANIMATION_LISTENER == 1:
+    for _animation_env_var, _animation_env_value in (
+        ("ANIMATION_MQTT_HOST", ANIMATION_MQTT_HOST),
+        ("ANIMATION_MQTT_USERNAME", ANIMATION_MQTT_USERNAME),
+        ("ANIMATION_MQTT_PASSWORD", ANIMATION_MQTT_PASSWORD),
+    ):
+        if not _animation_env_value:
+            raise ValueError(f"Environment variable {_animation_env_var} is required when ENABLE_ANIMATION_LISTENER is 1")
+
 FONT = os.getenv("FONT") or ""
 # FONT name should contain "<width>x<height>" (e.g. "5x7.bdf", "clR6x12.bdf") so this gets font width for alignment
 _FONT_DIMENSIONS_MATCH = re.search(r"(\d+)x(\d+)", FONT)

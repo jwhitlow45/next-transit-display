@@ -12,6 +12,8 @@ from httpx import HTTPStatusError
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
 from models.SunriseSunset import SunriseSunsetResult
+from modules.animation_player import MIN_GAP_SECONDS, AnimationContext, can_start, play_animation
+from modules.animation_queue import AnimationQueue
 from modules.departure_animation import (
     DEPARTURE_ANIMATION_DURATION_SECONDS,
     DepartureAnimationRow,
@@ -43,8 +45,15 @@ display_info_lock = threading.Lock()
 sunrise_sunset_result: SunriseSunsetResult | None = None
 sunrise_sunset_result_lock = threading.Lock()
 
+# event animations published over MQTT, None while the listener is disabled. Set before the threads start
+animation_queue: AnimationQueue | None = None
+
 
 def main():
+    global animation_queue
+    if env.ENABLE_ANIMATION_LISTENER == 1:
+        animation_queue = start_animation_listener()
+
     # daemon threads so the process can exit on Ctrl+C/SIGTERM instead of hanging on the while True loops
     threads = [
         threading.Thread(target=display_loop, daemon=True),
@@ -54,6 +63,48 @@ def main():
 
     # will never end as threads are while True loops, but waiting for their completion keeps the program running
     [thread.join() for thread in threads]
+
+
+def start_animation_listener():
+    """Starts the MQTT animation listener, returning the queue it fills for the display thread to play from
+
+    Called from main() before the display and API threads start, so a bad import or a missing paho-mqtt exits
+    the process for systemd to restart. Raised inside display_loop it would end that thread alone and leave a
+    dark panel. The imports live here so a display with the listener off never loads paho or the animations.
+    """
+    from modules.animation_mqtt import AnimationListener
+    from modules.animation_registry import AnimationIntake
+
+    queue = AnimationQueue()
+    AnimationListener(
+        env.ANIMATION_MQTT_HOST,
+        env.ANIMATION_MQTT_PORT,
+        env.ANIMATION_MQTT_USERNAME,
+        env.ANIMATION_MQTT_PASSWORD,
+        AnimationIntake(queue).submit,
+    ).start()
+    return queue
+
+
+def play_startable_animation(matrix, canvas, animation_context, next_arrival_time: datetime | None, last_animation_end: datetime | None):
+    """Plays the next queued event animation if it can start now without running into the next departure
+
+    Returns:
+        (canvas, datetime | None, bool): the canvas to keep drawing on, when the last event animation ended, and
+            whether one played
+    """
+    if animation_queue is None:
+        return canvas, last_animation_end, False
+    now = datetime.now(timezone.utc)
+    request = animation_queue.pop_if_startable(
+        lambda duration_seconds: can_start(
+            now, next_arrival_time, duration_seconds, env.PULSE_WINDOW_SECONDS, last_animation_end
+        )
+    )
+    if request is None:
+        return canvas, last_animation_end, False
+    canvas = play_animation(matrix, canvas, request, animation_context)
+    return canvas, datetime.now(timezone.utc), True
 
 
 def stop_visit_sort_key(stop_visit: StopVisitModel):
@@ -241,16 +292,30 @@ def apply_sun_based_brightness(canvas):
     canvas.brightness = brightness
 
 
-def sleep_until_next_frame(next_arrival_time: datetime | None):
+def sleep_until_next_frame(next_arrival_time: datetime | None, last_animation_end: datetime | None):
     """Sleeps until the next display refresh or until the soonest displayed arrival is about to hit 0,
-    whichever is sooner, waking early enough to pulse the arrival time before its departure animation"""
+    whichever is sooner, waking early enough to pulse the arrival time before its departure animation
+
+    With the animation listener on, a newly published animation also ends the sleep so the next pass can play it
+    """
     sleep_seconds = float(env.REFRESH_DISPLAY_INTERVAL_SECONDS)
     if next_arrival_time is not None:
         seconds_until_pulse_window = (
             next_arrival_time - datetime.now(timezone.utc)
         ).total_seconds() - env.PULSE_WINDOW_SECONDS
         sleep_seconds = min(sleep_seconds, max(seconds_until_pulse_window, 0))
-    sleep(sleep_seconds)
+    if animation_queue is None:
+        sleep(sleep_seconds)
+        return
+
+    # a request waiting only on the gap after the last event animation can start once the gap ends
+    if last_animation_end is not None and animation_queue.has_waiting():
+        seconds_until_gap_ends = (
+            last_animation_end + timedelta(seconds=MIN_GAP_SECONDS) - datetime.now(timezone.utc)
+        ).total_seconds()
+        if seconds_until_gap_ends > 0:
+            sleep_seconds = min(sleep_seconds, seconds_until_gap_ends)
+    animation_queue.wait_for_new(sleep_seconds)
 
 
 def pulse_imminent_arrivals(
@@ -423,6 +488,15 @@ def display_loop():
     )
     canvas = matrix.CreateFrameCanvas()
 
+    # event animations always draw banners in the 5x7 font, whatever FONT is, so the contract's banner timing
+    # holds. Loaded only with the listener on, so a display with it off takes exactly today's path
+    animation_context: AnimationContext | None = None
+    last_animation_end: datetime | None = None
+    if animation_queue is not None:
+        font_5x7 = graphics.Font()
+        font_5x7.LoadFont(path.join("fonts", "5x7.bdf"))
+        animation_context = AnimationContext(font_5x7, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
+
     while True:
         try:
             # snapshot the dict reference so drawing doesn't block api_loop; safe because api_loop
@@ -434,6 +508,10 @@ def display_loop():
             if display_info_snapshot is None or len(display_info_snapshot) == 0:
                 apply_sun_based_brightness(canvas)
                 canvas = play_loading_animation(matrix, canvas, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
+                # no arrivals are displayed yet, so no departure can be due
+                canvas, last_animation_end, _ = play_startable_animation(
+                    matrix, canvas, animation_context, None, last_animation_end
+                )
                 continue
 
             now = datetime.now(timezone.utc)
@@ -453,6 +531,14 @@ def display_loop():
                     (arrival_time for row_times in display_line_arrival_times for arrival_time in row_times),
                     default=None,
                 )
+
+            # checked with this pass's fresh rows, before anything is drawn, so an arrival that just departed
+            # never counts as the next one. After playing, the next pass rebuilds the rows with fresh times
+            canvas, last_animation_end, animation_played = play_startable_animation(
+                matrix, canvas, animation_context, next_arrival_time, last_animation_end
+            )
+            if animation_played:
+                continue
 
             graphics_display_line_args = get_display_line_draw_args(
                 display_lines, display_line_arrival_times, display_line_colors, font, now
@@ -474,7 +560,9 @@ def display_loop():
                 canvas
             )  # draw canvas, set returned canvas as new canvas to prevent flickering
 
-            sleep_until_next_frame(next_arrival_time)
+            # however the sleep ends the pulse and departure steps follow, so a stream of new animation
+            # requests can never skip a departure
+            sleep_until_next_frame(next_arrival_time, last_animation_end)
             canvas = pulse_imminent_arrivals(
                 matrix,
                 canvas,
