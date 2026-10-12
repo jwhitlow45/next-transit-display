@@ -253,17 +253,24 @@ Optional comma-separated list of the sprites making up the departure animation's
 
 Valid sprite names:
 ```
-BUS STREETCAR SUBWAY_CAR GHOST_BUS PUMPKIN_COACH HEARSE BAT
+BUS STREETCAR SUBWAY_CAR GHOST_BUS PUMPKIN_COACH HEARSE BAT CHICKEN_JOCKEY PIG COW CREEPER
 ```
 Names are case sensitive. Spaces around them are ignored. An unknown name stops the display at startup with an error listing the valid names.
 
 `GHOST_BUS`, `PUMPKIN_COACH`, `HEARSE`, and `BAT` are Halloween themed. The bat flies above the road line rather than driving along it.
+
+`CHICKEN_JOCKEY`, `PIG`, `COW`, and `CREEPER` are Minecraft themed. The creeper faces you, since its face is what makes it a creeper.
 
 Every pass of the animation takes the same amount of time, so longer convoys drive faster.
 
 Example Halloween convoy with a bat flying out in front of a hearse towing the rest:
 ```
 DEPARTURE_ANIMATION_SPRITES="BAT,HEARSE,PUMPKIN_COACH,GHOST_BUS"
+```
+
+Example Minecraft convoy, a chicken jockey leading a pig, a cow, and a creeper:
+```
+DEPARTURE_ANIMATION_SPRITES="CHICKEN_JOCKEY,PIG,COW,CREEPER"
 ```
 
 #### Departure pulse configuration (optional)

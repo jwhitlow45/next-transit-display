@@ -31,6 +31,12 @@ SPRITE_COLOR_LEGEND = {
     # yellow down to the brightness of brighter oranges, so only a dimmer orange stays darker than the face
     "O": Colors.MUNI_LESS,
     "P": Colors.PURPLE,
+    "N": cap_if_enabled((255, 90, 120)),  # pig pink, saturated since Colors.PINK reads near white on LEDs
+    "M": cap_if_enabled((140, 20, 50)),  # pig snout and hooves, dark enough to stand out under the cap
+    "H": cap_if_enabled((100, 55, 20)),  # cow hide
+    "E": cap_if_enabled((0, 110, 0)),  # creeper mottling
+    "Z": cap_if_enabled((0, 150, 90)),  # zombie skin
+    "T": Colors.CYAN,  # zombie shirt
 }
 
 # NOTE: sprites are 7 pixels tall to fill one row of a 7 pixel tall font, taller fonts leave headroom
@@ -115,6 +121,50 @@ _BAT_SPRITE = [
     ".........",
 ]
 
+# minecraft chicken jockey: a baby zombie, arms out, riding a white chicken with a yellow beak and red wattle
+_CHICKEN_JOCKEY_SPRITE = [
+    "...ZZ......",
+    "...ZZ...WW.",
+    "...TTZZ.W.Y",
+    ".W.BB...WWR",
+    ".WWWWWWWWW.",
+    "..WWWWWWW..",
+    "...Y...Y...",
+]
+
+# minecraft pig: a boxy pink body with a square head, darker snout, and a curl of tail
+_PIG_SPRITE = [
+    ".........NNNN.",
+    ".NNNNNNNNNN.NM",
+    "MNNNNNNNNNNNNM",
+    ".NNNNNNNNNNNN.",
+    ".NNNNNNNNN....",
+    "..MM....MM....",
+]
+
+# minecraft cow: brown hide with white patches, horns, and a white muzzle
+_COW_SPRITE = [
+    "...........C..C.",
+    "...........HHHH.",
+    ".HHHWWHHHHHHH.HH",
+    ".HWWWHHHWWHHHHHW",
+    ".HHHHHHWWWHHHHW.",
+    "..HH.....HH.....",
+    "..HH.....HH.....",
+]
+
+# minecraft creeper, face on since the face is what makes it a creeper: mottled green with the face left
+# unlit, as black pixels are just unlit LEDs
+_CREEPER_SPRITE = [
+    "GGEGGEGG",
+    "G..GG..G",
+    "GGG..GGG",
+    "GG....GG",
+    "GG.GG.GG",
+    ".GEGGEG.",
+    ".EE..EE.",
+]
+
 # these keys are the names DEPARTURE_ANIMATION_SPRITES and the convoy animation accept, keep ENVIRONMENT.md's
 # list of valid sprite names in sync
 SPRITES_BY_NAME = {
@@ -125,6 +175,10 @@ SPRITES_BY_NAME = {
     "PUMPKIN_COACH": _PUMPKIN_COACH_SPRITE,
     "HEARSE": _HEARSE_SPRITE,
     "BAT": _BAT_SPRITE,
+    "CHICKEN_JOCKEY": _CHICKEN_JOCKEY_SPRITE,
+    "PIG": _PIG_SPRITE,
+    "COW": _COW_SPRITE,
+    "CREEPER": _CREEPER_SPRITE,
 }
 
 

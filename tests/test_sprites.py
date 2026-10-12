@@ -11,6 +11,27 @@ from modules.sprites import (
 from tests.fakes import FakeCanvas
 
 
+class SpriteNamesTest(unittest.TestCase):
+    def test_names_match_the_animation_contract(self):
+        # publishers send these names in convoy requests, so renaming or removing one breaks contract v1
+        self.assertEqual(
+            list(SPRITES_BY_NAME),
+            [
+                "BUS",
+                "STREETCAR",
+                "SUBWAY_CAR",
+                "GHOST_BUS",
+                "PUMPKIN_COACH",
+                "HEARSE",
+                "BAT",
+                "CHICKEN_JOCKEY",
+                "PIG",
+                "COW",
+                "CREEPER",
+            ],
+        )
+
+
 class ValidateSpriteTest(unittest.TestCase):
     def test_every_registered_sprite_is_valid(self):
         for sprite_name, sprite in SPRITES_BY_NAME.items():
