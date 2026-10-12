@@ -19,7 +19,8 @@ REPO_DIR = os.path.dirname(TESTS_DIR)
 # every variable the display reads, so nothing leaks in from the shell either. Optional ones are set empty
 # to take their defaults
 TEST_ENVIRONMENT = {
-    "LOG_LEVEL": "",
+    # quiet, assertLogs still sees whatever a test asks for
+    "LOG_LEVEL": "CRITICAL",
     "OPEN_DATA_511_API_KEY_0": "test-api-key",
     "OPEN_DATA_511_API_KEY_1": "",
     "OPEN_DATA_511_AGENCY_ID": "SF",

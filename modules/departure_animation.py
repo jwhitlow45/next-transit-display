@@ -68,6 +68,33 @@ def _draw_convoy_towing_row(canvas, animation_row: DepartureAnimationRow, convoy
             canvas.SetPixel(rope_x_pos, rope_y_pos, *SPRITE_COLOR_LEGEND["K"])
 
 
+def draw_convoy_pass_frame(canvas, sprite_names: tuple[str, ...], direction: AnimationDirection, display_width: int, display_height: int, elapsed_seconds: float):
+    """Draws one frame of a convoy driving across the vertical center of an otherwise blank display
+
+    This is the loading screen's pass, shared with the convoy event animation so both drive exactly alike. It
+    lasts DEPARTURE_ANIMATION_DURATION_SECONDS, blank for the entry buffer, then the convoy crosses.
+
+    Args:
+        canvas: cleared canvas to draw the frame on
+        sprite_names (tuple[str, ...]): sprites in the convoy, leading sprite first
+        direction (AnimationDirection): the direction the convoy drives
+        display_width (int): width of the display in pixels
+        display_height (int): height of the display in pixels
+        elapsed_seconds (float): time since the pass started
+    """
+    row_height = build_convoy(sprite_names, direction).height
+    _draw_departure_frame(
+        canvas,
+        elapsed_seconds,
+        display_width,
+        [DepartureAnimationRow(row_y_pos=(display_height - row_height) // 2, direction=direction)],
+        row_height,
+        lambda animation_canvas: None,  # nothing but the convoy on a blank display
+        lambda animation_canvas, segments, brightness_percent, x_offset: None,  # nothing to fade or tow
+        sprite_names,
+    )
+
+
 def play_loading_animation(matrix, canvas, display_width: int, display_height: int):
     """Plays one pass of the transit convoy driving across the vertical center of the display
 
@@ -82,16 +109,17 @@ def play_loading_animation(matrix, canvas, display_width: int, display_height: i
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
     """
-    row_height = build_convoy(_DEPARTURE_SPRITE_NAMES, AnimationDirection.LEFT_TO_RIGHT).height
-    row_y_pos = (display_height - row_height) // 2
-    return play_departure_animation(
+    return _play_frames(
         matrix,
         canvas,
-        display_width,
-        [DepartureAnimationRow(row_y_pos=row_y_pos, direction=AnimationDirection.LEFT_TO_RIGHT)],
-        row_height,
-        lambda animation_canvas: None,  # nothing but the convoy on a blank display
-        lambda animation_canvas, segments, brightness_percent, x_offset: None,  # nothing to fade or tow
+        lambda animation_canvas, elapsed_seconds: draw_convoy_pass_frame(
+            animation_canvas,
+            _DEPARTURE_SPRITE_NAMES,
+            AnimationDirection.LEFT_TO_RIGHT,
+            display_width,
+            display_height,
+            elapsed_seconds,
+        ),
     )
 
 
@@ -116,22 +144,45 @@ def play_departure_animation(matrix, canvas, display_width: int, animation_row_l
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
     """
+    return _play_frames(
+        matrix,
+        canvas,
+        lambda animation_canvas, elapsed_seconds: _draw_departure_frame(
+            animation_canvas,
+            elapsed_seconds,
+            display_width,
+            animation_row_list,
+            row_height,
+            draw_background,
+            draw_segments,
+            _DEPARTURE_SPRITE_NAMES,
+        ),
+    )
+
+
+def _draw_departure_frame(canvas, elapsed_seconds: float, display_width: int, animation_row_list: list[DepartureAnimationRow], row_height: int, draw_background, draw_segments, sprite_names: tuple[str, ...]):
+    """Draws one frame of convoys driving through display rows, see play_departure_animation"""
+    travel_elapsed_seconds = elapsed_seconds - _ENTRY_EXIT_BUFFER_SECONDS
+    travel_percent = min(max(travel_elapsed_seconds / _TRAVEL_DURATION_SECONDS, 0.0), 1.0)
+
+    draw_background(canvas)
+    if travel_percent == 0:
+        # rows fade out before their convoys enter the display
+        fade_brightness_percent = max(1 - (elapsed_seconds / _ENTRY_EXIT_BUFFER_SECONDS), 0.0)
+        for animation_row in animation_row_list:
+            draw_segments(canvas, animation_row.fading_segments, fade_brightness_percent, 0)
+    else:
+        for animation_row in animation_row_list:
+            convoy = build_convoy(sprite_names, animation_row.direction)
+            _draw_convoy_towing_row(canvas, animation_row, convoy, row_height, display_width, travel_percent, draw_segments)
+
+
+def _play_frames(matrix, canvas, draw_frame):
+    """Swaps frames drawn by draw_frame(canvas, elapsed_seconds) onto the display for one animation's duration"""
     start_time = monotonic()
     while (elapsed_seconds := monotonic() - start_time) < DEPARTURE_ANIMATION_DURATION_SECONDS:
-        travel_elapsed_seconds = elapsed_seconds - _ENTRY_EXIT_BUFFER_SECONDS
-        travel_percent = min(max(travel_elapsed_seconds / _TRAVEL_DURATION_SECONDS, 0.0), 1.0)
-
         canvas.Clear()
-        draw_background(canvas)
-        if travel_percent == 0:
-            # rows fade out before their convoys enter the display
-            fade_brightness_percent = max(1 - (elapsed_seconds / _ENTRY_EXIT_BUFFER_SECONDS), 0.0)
-            for animation_row in animation_row_list:
-                draw_segments(canvas, animation_row.fading_segments, fade_brightness_percent, 0)
-        else:
-            for animation_row in animation_row_list:
-                convoy = build_convoy(_DEPARTURE_SPRITE_NAMES, animation_row.direction)
-                _draw_convoy_towing_row(canvas, animation_row, convoy, row_height, display_width, travel_percent, draw_segments)
+        draw_frame(canvas, elapsed_seconds)
         canvas = matrix.SwapOnVSync(canvas)
 
         sleep(1 / _FRAMES_PER_SECOND)
