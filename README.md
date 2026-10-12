@@ -77,5 +77,9 @@ sudo python3 -B main.py
 There is also support for a `LOG_LEVEL` environment variable supporting the usual `fatal|error|warning|info|debug` log levels. I'll be honest I kinda chucked in debug statements wherever I thought they would be helpful without thinking about traceability. I've never been a super low-level engineer so I have little to no experience writing professional debug logs. The option is there though.
 
 #### Testing
-This project didn't feel significant enough to warrant a test suite implementation. I'm not a Python developer and this already took me quite a while to design to be as robust as it is. Feel free to write tests for the code and PR them. I'm not going to.
+Tests use the standard library's `unittest`, so the local environment set up by `uv sync` is all they need. Run them from the root of the repo:
+```
+uv run python tests/run.py
+```
+The runner works from a scratch directory and sets every environment variable itself, so your `.env` and log file are never read or written. Tests draw onto a stand-in canvas from `tests/fakes.py`, so no matrix or emulator window is needed.
 
