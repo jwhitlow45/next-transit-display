@@ -64,8 +64,10 @@ Configure environment variables which are in [ENVIRONMENT.md](ENVIRONMENT.md).
 #### Deploying changes
 I found it simple enough to use rsync and scp to send files from my local machine to my Pi after making changes. The following command executed from the root of the repo accomplishes that:
 ```
-rsync -aPh --delete --filter=':- .gitignore' --exclude=.git/ . <user>@<host>:<path-to-remote-project> && scp .env <user>@<host>:<path-to-remote-project>/.env
+rsync -aPh --delete --filter=':- .gitignore' --exclude=.git/ --exclude=.env --exclude='*.log' --exclude=.venv/ --exclude=__pycache__/ --exclude=.ruff_cache/ --exclude=.mypy_cache/ . <user>@<host>:<path-to-remote-project> && scp .env <user>@<host>:<path-to-remote-project>/.env && ssh -t <user>@<host> 'cd <path-to-remote-project> && sudo /root/.local/bin/uv pip install --system --break-system-packages -r pyproject.toml'
 ```
+The explicit excludes repeat `.gitignore` on purpose. macOS ships `openrsync`, and it misreads that filter: without them the Pi's log is overwritten by your local one, and its `.env` is deleted before `scp` puts it back. The last step installs any dependency added since the last deploy, the same way the setup script does. Skipping it after a new dependency leaves the program crashing on startup with a `ModuleNotFoundError`.
+
 As always use whatever workflow works for you.
 
 #### Executing changes
