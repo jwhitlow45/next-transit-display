@@ -154,15 +154,16 @@ _COW_SPRITE = [
 ]
 
 # minecraft creeper, face on since the face is what makes it a creeper: mottled green with the face left
-# unlit, as black pixels are just unlit LEDs
+# unlit, as black pixels are just unlit LEDs. A narrow column like the game's mob, whose body is its tallest part,
+# so the face is simplified to two eyes and a mouth to leave room for it
 _CREEPER_SPRITE = [
-    "GGEGGEGG",
-    "G..GG..G",
-    "GGG..GGG",
-    "GG....GG",
-    "GG.GG.GG",
-    ".GEGGEG.",
-    ".EE..EE.",
+    "GEGGE",
+    "G.G.G",
+    "GG.GG",
+    "EGGEG",
+    "GEGGE",
+    "GGEGG",
+    "EG.GE",
 ]
 
 # these keys are the names DEPARTURE_ANIMATION_SPRITES and the convoy animation accept, keep ENVIRONMENT.md's
