@@ -15,6 +15,8 @@ def get_rgb_matrix(
     gpio_slowdown: int,
     hardware_mapping: str,
     matrix_brightness: int,
+    pwm_bits: int = 11,
+    limit_refresh_rate_hz: int = 0,
 ):
     """
     WARNING: The returned RGBMatrix object must be kept in memory while using its canvas.
@@ -34,6 +36,9 @@ def get_rgb_matrix(
         gpio_slowdown (int): GPIO slowdown value for timing adjustments.
         hardware_mapping (str): Hardware mapping string for the matrix.
         matrix_brightness (int): Brightness level of the matrix (0-100).
+        pwm_bits (int): PWM bits per color channel (1-11). Fewer bits refresh faster but lose color depth.
+        limit_refresh_rate_hz (int): Refresh rate cap in Hz, 0 for none. A cap holds the refresh rate steady, and a
+            refresh rate that keeps changing reads as flicker.
 
     Returns:
         RGBMatrix: Configured RGBMatrix object ready for use.
@@ -46,6 +51,8 @@ def get_rgb_matrix(
     options.parallel = parallel
     options.gpio_slowdown = gpio_slowdown  # type: ignore
     options.hardware_mapping = hardware_mapping
+    options.pwm_bits = pwm_bits
+    options.limit_refresh_rate_hz = limit_refresh_rate_hz  # type: ignore
     options.drop_privileges = False  # type: ignore # prevents python from removing root privileges at execution time
 
     matrix = RGBMatrix(options=options)
