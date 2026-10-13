@@ -69,10 +69,13 @@ LED_MATRIX_MAX_BRIGHTNESS="<integer>"
 ```
 LED_MATRIX_PWM_BITS=""
 LED_MATRIX_LIMIT_REFRESH_RATE_HZ=""
+LED_MATRIX_PWM_LSB_NANOSECONDS=""
 ```
-Both optional. `LED_MATRIX_LIMIT_REFRESH_RATE_HZ` caps the refresh rate. Without a cap the rate swings with whatever else the Pi is doing, and those swings read as flicker. A cap a little under the lowest rate the panel holds while the Pi is busy keeps it steady: on the Pi 3 Model A+ above, a slowdown of 2 with a 160 Hz cap held 156 to 160 Hz. Defaults to 0, no cap.
+All optional. `LED_MATRIX_LIMIT_REFRESH_RATE_HZ` caps the refresh rate. Without a cap the rate swings with whatever else the Pi is doing, and those swings read as flicker. A cap a little under the lowest rate the panel holds while the Pi is busy keeps it steady: on the Pi 3 Model A+ above, a slowdown of 2 with a 160 Hz cap held 156 to 160 Hz. Defaults to 0, no cap.
 
 `LED_MATRIX_PWM_BITS` sets the color depth per channel, 1 to 11. Fewer bits refresh faster, but dim colors band or vanish, which matters for a display that dims at night. Defaults to 11, the library's default.
+
+`LED_MATRIX_PWM_LSB_NANOSECONDS` sets how long the lowest color bit stays lit, in nanoseconds, and every higher bit lasts a doubling of it. Lower values refresh faster, which helps when the CPU runs slow. On the Pi 3 Model A+ above, held at 600 MHz, the default of 130 topped out near 130 Hz, while 80 with a 160 Hz cap averaged 160 Hz. The cost is a dimmer panel at the same brightness, and on some panels ghosting. Defaults to 130, the library's default. The library allows 50 to 3000.
 
 Brightness that jumps, rather than flickers, can mean the Pi is throttling. Check `vcgencmd get_throttled`: `0x50005` means under-voltage and throttling right now, and the Pi can also throttle when it runs hot. With the `adafruit-hat` mapping the library times the LED pulses in software, with busy loops tuned for full CPU speed, so when the firmware lowers the CPU clock the pulses stretch and the panel brightens. The fix is power: a stronger supply, or a separate one for the Pi. Soldering the bonnet's GPIO4 to GPIO18 jumper and using `adafruit-hat-pwm` also helps, since the pulses are then timed in hardware. As a temporary workaround, tested only on the Pi 3 Model A+ above: pinning its CPU at 600 MHz at runtime, by writing 600000 to `/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq`, left throttling nothing to lower. With a slowdown of 1 and a 120 Hz cap it held a steady 120 Hz, and the under-voltage warnings stopped during testing, at the cost of a lower refresh rate. The runtime pin resets at reboot. The boot setting `arm_freq=600` in `/boot/firmware/config.txt` (`/boot/config.txt` on Raspberry Pi OS before Bookworm) should make it permanent, but it has not been tested here, and other Pi models throttle to different clocks.
 

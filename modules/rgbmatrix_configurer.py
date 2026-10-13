@@ -17,6 +17,7 @@ def get_rgb_matrix(
     matrix_brightness: int,
     pwm_bits: int = 11,
     limit_refresh_rate_hz: int = 0,
+    pwm_lsb_nanoseconds: int = 130,
 ):
     """
     WARNING: The returned RGBMatrix object must be kept in memory while using its canvas.
@@ -39,6 +40,8 @@ def get_rgb_matrix(
         pwm_bits (int): PWM bits per color channel (1-11). Fewer bits refresh faster but lose color depth.
         limit_refresh_rate_hz (int): Refresh rate cap in Hz, 0 for none. A cap holds the refresh rate steady, and a
             refresh rate that keeps changing reads as flicker.
+        pwm_lsb_nanoseconds (int): On-time of the lowest PWM bit in nanoseconds (50-3000). Lower values refresh faster
+            but light the panel less.
 
     Returns:
         RGBMatrix: Configured RGBMatrix object ready for use.
@@ -53,6 +56,7 @@ def get_rgb_matrix(
     options.hardware_mapping = hardware_mapping
     options.pwm_bits = pwm_bits
     options.limit_refresh_rate_hz = limit_refresh_rate_hz  # type: ignore
+    options.pwm_lsb_nanoseconds = pwm_lsb_nanoseconds
     options.drop_privileges = False  # type: ignore # prevents python from removing root privileges at execution time
 
     matrix = RGBMatrix(options=options)
