@@ -26,20 +26,24 @@ if [ "${copy_env}" = "--env" ] && [ ! -f .env ]; then
   exit 1
 fi
 
-scp "${tarball}" "${host}:/tmp/${name}.tar.gz"
+# A folder on the Pi that only the ssh user can read, made fresh for this deploy. Other users can't read the API keys
+# in .env on the way, and nothing left by an earlier, interrupted deploy gets installed
+staging="$(ssh "${host}" mktemp -d)"
+trap 'ssh "${host}" "rm -rf ${staging}" || true' EXIT
+
+scp "${tarball}" "${host}:${staging}/release.tar.gz"
 if [ "${copy_env}" = "--env" ]; then
-  scp .env "${host}:/tmp/next-transit-display.env"
+  scp .env "${host}:${staging}/.env"
 fi
 
-# stopped before unpacking, since the running binary can't be overwritten in place
+# Stopped before unpacking, since the running binary can't be overwritten in place. A program that exits at startup,
+# such as on a bad .env, shows as activating while systemd waits to restart it, so the last check fails the deploy
 ssh "${host}" "set -e
   sudo mkdir -p ${install_dir}
   sudo systemctl stop next-transit-display.service || true
-  sudo tar -xzf /tmp/${name}.tar.gz -C ${install_dir} --strip-components=1
-  rm /tmp/${name}.tar.gz
-  if [ -f /tmp/next-transit-display.env ]; then
-    sudo install -m 600 /tmp/next-transit-display.env ${install_dir}/.env
-    rm /tmp/next-transit-display.env
+  sudo tar -xzf ${staging}/release.tar.gz -C ${install_dir} --strip-components=1
+  if [ '${copy_env}' = '--env' ]; then
+    sudo install -m 600 ${staging}/.env ${install_dir}/.env
   fi
   if [ ! -f ${install_dir}/.env ]; then
     echo 'No ${install_dir}/.env on the Pi, copy .env.example to it and fill it in' >&2
@@ -47,6 +51,11 @@ ssh "${host}" "set -e
   fi
   sudo install -m 644 ${install_dir}/next-transit-display.service /etc/systemd/system/next-transit-display.service
   sudo systemctl daemon-reload
-  sudo systemctl enable --now next-transit-display.service
+  sudo systemctl enable next-transit-display.service
   sudo systemctl restart next-transit-display.service
-  systemctl status next-transit-display.service --no-pager | head -5"
+  sleep 3
+  systemctl status next-transit-display.service --no-pager | head -5
+  if ! systemctl is-active --quiet next-transit-display.service; then
+    echo 'next-transit-display.service is not running, see journalctl -u next-transit-display.service' >&2
+    exit 1
+  fi"
