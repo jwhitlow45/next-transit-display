@@ -1,7 +1,7 @@
-"""banner: text scrolling right to left across the middle of the panel at a fixed 30 px/s
+"""banner: text scrolling right to left across the middle of the panel at a fixed 60 px/s
 
 It always uses the 5x7 font, whatever FONT is set to, so its width and the contract's duration formula hold: the
-text enters from the right edge and the request ends as its last character leaves the left edge. At 30 px/s, 47
+text enters from the right edge and the request ends as its last character leaves the left edge. At 60 px/s, 107
 characters is the most that fits in the 10 s cap.
 """
 
@@ -13,10 +13,11 @@ from modules.rgbmatrix_importer import get_rgb_matrix_imports
 
 _, _, graphics = get_rgb_matrix_imports()
 
-SCROLL_PIXELS_PER_SECOND = 30
+SCROLL_PIXELS_PER_SECOND = 60
 CHARACTER_WIDTH_PIXELS = 5
 _CHARACTER_HEIGHT_PIXELS = 7
-TEXT_MAX_CHARACTERS = 47
+# the most text that scrolls fully across the 64 px panel within the 10 s cap: (10 * 60 - 64) // 5
+TEXT_MAX_CHARACTERS = 107
 
 
 class BannerParams(BaseModel):

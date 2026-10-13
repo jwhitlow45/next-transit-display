@@ -89,17 +89,19 @@ class BannerTest(unittest.TestCase):
     def test_scrolls_in_from_the_right_and_off_to_the_left(self):
         frames, _ = _play("banner", BannerParams(text="WARDEN"))
         self.assertEqual(frames[0], {})
-        self.assertEqual(frames[-1], {})
+        # the text moves 2 px a frame, so the last frame can still show the final letter's last column at the edge
+        self.assertTrue(all(x <= 1 for x, _ in frames[-1]))
 
-    def test_text_sits_where_30_pixels_a_second_puts_it(self):
+    def test_text_sits_where_60_pixels_a_second_puts_it(self):
         params = BannerParams(text="WARDEN")
         white = graphics.Color(255, 255, 255)
-        for elapsed_seconds in (0.5, 1.0, 2.0, 3.0):
+        # WARDEN takes (64 + 30) / 60 = 1.57 s to cross, so every one of these frames shows some of it
+        for elapsed_seconds in (0.25, 0.5, 1.0, 1.4):
             with self.subTest(elapsed_seconds):
                 canvas = FakeCanvas()
                 ANIMATIONS["banner"].draw_frame(canvas, elapsed_seconds, params, CONTEXT)
                 expected = FakeCanvas()
-                graphics.DrawText(expected, _FONT_5X7, 64 - int(elapsed_seconds * 30), 18, white, "WARDEN")
+                graphics.DrawText(expected, _FONT_5X7, 64 - int(elapsed_seconds * 60), 18, white, "WARDEN")
                 self.assertTrue(canvas.pixels)
                 self.assertEqual(canvas.pixels, expected.pixels)
 
@@ -109,8 +111,8 @@ class BannerTest(unittest.TestCase):
         self.assertTrue(lit_rows)
         self.assertTrue(lit_rows <= set(range(12, 20)))
 
-    def test_duration_scrolls_the_whole_text_at_30_pixels_a_second(self):
-        self.assertAlmostEqual(ANIMATIONS["banner"].duration_seconds(BannerParams(text="x" * 10)), (64 + 50) / 30)
+    def test_duration_scrolls_the_whole_text_at_60_pixels_a_second(self):
+        self.assertAlmostEqual(ANIMATIONS["banner"].duration_seconds(BannerParams(text="x" * 10)), (64 + 50) / 60)
 
     def test_color_takes_the_luminance_cap(self):
         with mock.patch.object(display_utils, "COLOR_LUMINANCE_CAP", 100):

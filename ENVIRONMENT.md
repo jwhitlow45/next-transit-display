@@ -401,7 +401,7 @@ Publish to `transit-display/animations/play` with QoS 0 and without retain, as U
 |:---|:---|:---|
 | `convoy` | `sprites`: 1 to 6 of the valid sprite names listed under DEPARTURE_ANIMATION_SPRITES, leading sprite first. `direction`: `"R"` (default) or `"L"` | 3 s |
 | `flash` | `colors`: 1 to 20 `[r, g, b]` triples of integers 0 to 255. `step_ms`: 500 to 2000, default 700. `repeats`: 1 to 4, default 1 | colors × step_ms × repeats |
-| `banner` | `text`: 1 to 47 printable ASCII characters. `color`: `[r, g, b]`, default white | (64 + 5 × characters) ÷ 30 s |
+| `banner` | `text`: 1 to 107 printable ASCII characters. `color`: `[r, g, b]`, default white | (64 + 5 × characters) ÷ 60 s |
 
 Every animation takes over the whole panel, then the transit view comes back. A request longer than 10 seconds, or one that breaks any of the rules above, is dropped and logged rather than cut short, with rejections logged at most once a minute.
 

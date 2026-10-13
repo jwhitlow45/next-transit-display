@@ -28,7 +28,7 @@ class ParseRequestTest(unittest.TestCase):
         payloads = {
             b'{"v":1,"animation":"convoy","params":{"sprites":["CHICKEN_JOCKEY","PIG","COW","CREEPER"],"direction":"R"}}': 3.0,
             b'{"v":1,"animation":"flash","params":{"colors":[[255,0,0],[255,90,0],[200,0,0]],"step_ms":600,"repeats":1}}': 1.8,
-            b'{"v":1,"animation":"banner","params":{"text":"Steve was blown up by Creeper","color":[255,0,0]}}': (64 + 5 * 29) / 30,
+            b'{"v":1,"animation":"banner","params":{"text":"Steve was blown up by Creeper","color":[255,0,0]}}': (64 + 5 * 29) / 60,
         }
         for payload, duration_seconds in payloads.items():
             with self.subTest(payload):
@@ -40,7 +40,7 @@ class ParseRequestTest(unittest.TestCase):
         self.assertEqual(explicit.key, defaulted.key)
 
     def test_accepts_the_longest_requests_the_contract_allows(self):
-        self.assertAlmostEqual(parse_request(_payload("banner", {"text": "x" * 47})).duration_seconds, 299 / 30)
+        self.assertAlmostEqual(parse_request(_payload("banner", {"text": "x" * 107})).duration_seconds, 599 / 60)
         flash_params = {"colors": [[1, 2, 3]] * 20, "step_ms": 500, "repeats": 1}
         self.assertEqual(parse_request(_payload("flash", flash_params)).duration_seconds, 10.0)
 
@@ -68,7 +68,7 @@ class ParseRequestTest(unittest.TestCase):
             "boolean channel": _payload("flash", {"colors": [[True, 0, 0]]}),
             "step under the floor": _payload("flash", {"colors": [[255, 0, 0]], "step_ms": 499}),
             "flash over 10 s": _payload("flash", {"colors": [[255, 0, 0]] * 20, "step_ms": 2000, "repeats": 4}),
-            "48 character banner": _payload("banner", {"text": "x" * 48}),
+            "108 character banner": _payload("banner", {"text": "x" * 108}),
             "non ASCII banner": _payload("banner", {"text": "café"}),
             "banner with a newline": _payload("banner", {"text": "two\nlines"}),
             "empty banner": _payload("banner", {"text": ""}),
