@@ -52,7 +52,7 @@ LED_MATRIX_PARALLEL="<integer>"
 ```
 LED_MATRIX_GPIO_SLOWDOWN="2"
 ```
-How much to slow the GPIO writes so the panel can keep up. Too low and pixels glitch or ghost. Too high and the refresh rate drops, and a low or uneven refresh rate is what reads as flicker. Measured on a Raspberry Pi 3 Model A+ with the Adafruit bonnet: a slowdown of 10 refreshed anywhere from 107 to 161 Hz, while 2 reached about 207 Hz. Start at 2 on a Pi 3 or 4 on a Pi 4, and raise it only if pixels glitch.
+How much to slow the GPIO writes so the panel can keep up. Too low and pixels glitch or ghost. Too high and the refresh rate drops, and a low or uneven refresh rate is what reads as flicker. Measured on a Raspberry Pi 3 Model A+ with the Adafruit bonnet: a slowdown of 10 refreshed anywhere from 107 to 161 Hz, while 2 swung between about 163 and 208 Hz. The library accepts 0 to 10 and defaults to 1. Start at 2 on a Pi 3 or 4 on a Pi 4, and raise it only if pixels glitch.
 
 [Hardware mappings](https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/wiring.md#alternative-hardware-mappings)
 ```
@@ -70,9 +70,11 @@ LED_MATRIX_MAX_BRIGHTNESS="<integer>"
 LED_MATRIX_PWM_BITS=""
 LED_MATRIX_LIMIT_REFRESH_RATE_HZ=""
 ```
-Both optional. `LED_MATRIX_LIMIT_REFRESH_RATE_HZ` caps the refresh rate. Without a cap the rate swings with whatever else the Pi is doing, and those swings read as flicker. A cap a little under what the panel reaches holds it steady: on the Pi 3 Model A+ above, a slowdown of 2 with a 160 Hz cap held 156 to 160 Hz. Defaults to 0, no cap.
+Both optional. `LED_MATRIX_LIMIT_REFRESH_RATE_HZ` caps the refresh rate. Without a cap the rate swings with whatever else the Pi is doing, and those swings read as flicker. A cap a little under the lowest rate the panel holds while the Pi is busy keeps it steady: on the Pi 3 Model A+ above, a slowdown of 2 with a 160 Hz cap held 156 to 160 Hz. Defaults to 0, no cap.
 
 `LED_MATRIX_PWM_BITS` sets the color depth per channel, 1 to 11. Fewer bits refresh faster, but dim colors band or vanish, which matters for a display that dims at night. Defaults to 11, the library's default.
+
+Brightness that jumps, rather than flickers, usually means the Pi is throttling. Check `vcgencmd get_throttled`: `0x50005` means under-voltage and throttling right now. With the `adafruit-hat` mapping the library times the LED pulses in software, with busy loops tuned for full CPU speed, so when the firmware drops the CPU to 600 MHz the pulses stretch and the panel brightens. The fix is power: a stronger supply, or a separate one for the Pi. Soldering the bonnet's GPIO4 to GPIO18 jumper and using `adafruit-hat-pwm` also helps, since the pulses are then timed in hardware. As a temporary workaround only, pinning the CPU at 600 MHz (`arm_freq=600` in `/boot/firmware/config.txt`) leaves throttling nothing to change. On the Pi 3 Model A+ above that held a steady 120 Hz with a slowdown of 1 and a 120 Hz cap, and the under-voltage warnings stopped during testing, at the cost of a lower refresh rate.
 
 ### Refresh interval variables
 #### REFRESH_API_INTERVAL_SECONDS
