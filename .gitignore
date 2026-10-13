@@ -9,3 +9,5 @@ __pycache__/
 
 # Logging
 *.log
+# rotated by modules/logger.py
+*.log.*
