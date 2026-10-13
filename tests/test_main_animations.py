@@ -12,6 +12,10 @@ import main
 from modules.animation_queue import AnimationQueue
 from modules.animation_registry import parse_request
 
+# these waits time out after 5 s, so returning within 4 s proves an early wake while leaving room for a
+# loaded Pi or CI host
+_WOKE_EARLY_SECONDS = 4
+
 _FLASH = json.dumps({"v": 1, "animation": "flash", "params": {"colors": [[255, 255, 255]]}}).encode()
 
 
@@ -60,7 +64,7 @@ class SleepUntilNextFrameTest(unittest.TestCase):
             start = time.monotonic()
             main.sleep_until_next_frame(None, None)
             timer.join()
-        self.assertLess(time.monotonic() - start, 1)
+        self.assertLess(time.monotonic() - start, _WOKE_EARLY_SECONDS)
 
     def test_a_held_request_does_not_end_the_sleep(self):
         queue = _queue_with_flash()
@@ -79,7 +83,7 @@ class SleepUntilNextFrameTest(unittest.TestCase):
         with mock.patch.object(main, "animation_queue", queue):
             start = time.monotonic()
             main.sleep_until_next_frame(None, last_end)
-        self.assertLess(time.monotonic() - start, 1)
+        self.assertLess(time.monotonic() - start, _WOKE_EARLY_SECONDS)
 
 
 class StartAnimationListenerTest(unittest.TestCase):

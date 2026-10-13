@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from modules.animation_player import Animation, AnimationRequest
 from modules.animation_queue import AnimationQueue
 
+# these waits time out after 5 s, so returning within 4 s proves an early wake while leaving room for a
+# loaded Pi or CI host
+_WOKE_EARLY_SECONDS = 4
+
 
 class _Params(BaseModel):
     value: int = 0
@@ -110,7 +114,7 @@ class WaitForNewTest(unittest.TestCase):
         queue.put(_request())
         start = time.monotonic()
         queue.wait_for_new(5)
-        self.assertLess(time.monotonic() - start, 1)
+        self.assertLess(time.monotonic() - start, _WOKE_EARLY_SECONDS)
 
     def test_waiting_requests_alone_do_not_wake_it(self):
         queue = AnimationQueue()
@@ -128,7 +132,7 @@ class WaitForNewTest(unittest.TestCase):
         start = time.monotonic()
         queue.wait_for_new(5)
         timer.join()
-        self.assertLess(time.monotonic() - start, 1)
+        self.assertLess(time.monotonic() - start, _WOKE_EARLY_SECONDS)
 
     def test_one_submission_wakes_one_wait(self):
         queue = AnimationQueue()

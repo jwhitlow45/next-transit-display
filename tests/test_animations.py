@@ -39,6 +39,16 @@ def _play(name: str, params):
     return matrix.frames, canvas
 
 
+class PowerGuardTest(unittest.TestCase):
+    def test_no_animation_fills_the_panel_around_the_power_guard(self):
+        # fill_panel is the only way through the channel cap, so a direct Fill would light the panel past it
+        animations_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "animations")
+        for file_name in sorted(os.listdir(animations_dir)):
+            if file_name.endswith(".py"):
+                with self.subTest(file_name), open(os.path.join(animations_dir, file_name)) as source:
+                    self.assertNotIn(".Fill(", source.read())
+
+
 class ConvoyTest(unittest.TestCase):
     def test_drives_through_the_middle_of_a_blank_panel(self):
         frames, _ = _play("convoy", ConvoyParams(sprites=("CHICKEN_JOCKEY", "PIG", "COW", "CREEPER")))
