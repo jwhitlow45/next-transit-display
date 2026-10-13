@@ -13,6 +13,8 @@ Display estimated arrival information about your local transit stops on an LED m
 - Python 3.11.2 (newest version of Python I could build `rpi-rgb-led-matrix` with)
 - git
 
+The prebuilt binary below needs only the OS. Python and git are for the install script and for development.
+
 ## Setup
 ### Prebuilt binary
 Each [GitHub release](https://github.com/jwhitlow45/next-transit-display/releases) has a standalone build for 64-bit Raspberry Pi OS Bookworm, with Python, every dependency and the LED matrix library bundled. It needs no install script. [BUILDING.md](BUILDING.md) covers installing it as a service, and building and releasing it yourself.

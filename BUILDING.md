@@ -51,16 +51,17 @@ The program needs root for the GPIO pins, and reads `.env` and `fonts/` from its
    sudo mkdir -p /opt/next-transit-display
    sudo tar -xzf /tmp/next-transit-display-<version>-linux-aarch64.tar.gz -C /opt/next-transit-display --strip-components=1
    ```
-2. Create the configuration. Copy `.env.example` to `.env` and fill it in (see [ENVIRONMENT.md](ENVIRONMENT.md)), or copy over an existing `.env`:
+2. Create the configuration, readable only by root since it holds your API keys. Copy `.env.example` to `.env` and fill it in (see [ENVIRONMENT.md](ENVIRONMENT.md)), or install an existing `.env` the same way:
    ```
-   sudo cp /opt/next-transit-display/.env.example /opt/next-transit-display/.env
+   sudo install -m 600 /opt/next-transit-display/.env.example /opt/next-transit-display/.env
    sudo nano /opt/next-transit-display/.env
    ```
 3. Install and start the service:
    ```
    sudo cp /opt/next-transit-display/next-transit-display.service /etc/systemd/system/
    sudo systemctl daemon-reload
-   sudo systemctl enable --now next-transit-display.service
+   sudo systemctl enable next-transit-display.service
+   sudo systemctl restart next-transit-display.service
    ```
 4. Check it started:
    ```
@@ -68,7 +69,7 @@ The program needs root for the GPIO pins, and reads `.env` and `fonts/` from its
    journalctl -u next-transit-display.service -f
    ```
 
-If the Pi already runs the Python version under a service of the same name, step 3 replaces that unit. Copy the old `.env` to `/opt/next-transit-display/.env` first. The log files start fresh in `/opt/next-transit-display`, and the old ones stay where they were.
+If the Pi already runs the Python version under a service of the same name, step 3 replaces that unit, and the restart replaces the running Python program. Copy the old `.env` to `/opt/next-transit-display/.env` first. The log files start fresh in `/opt/next-transit-display`, and the old ones stay where they were.
 
 To upgrade, unpack a newer release over the same folder and restart the service. The tarball has no `.env`, so the configuration and the log files stay as they are.
 
@@ -80,11 +81,11 @@ The LED matrix library's own advice still applies to the Pi: it runs best with t
 ```
 ./packaging/build.sh && ./packaging/deploy.sh <ssh host>
 ```
-It unpacks into `/opt/next-transit-display` and installs `next-transit-display.service`. The Pi keeps its own `.env` and log files. Add `--env` to copy this repo's `.env` over the Pi's first:
+It unpacks into `/opt/next-transit-display`, installs `next-transit-display.service`, and fails if the service isn't running a few seconds after the restart. The Pi keeps its own `.env` and log files. Add `--env` to copy this repo's `.env` over the Pi's first:
 ```
 ./packaging/deploy.sh <ssh host> --env
 ```
-The first deploy to a Pi needs a `.env` there, so use `--env` or create it as in step 2 above.
+The first deploy to a Pi needs a `.env` there, so use `--env` or create it as in step 2 above. The script runs `sudo` on the Pi without a terminal, so the ssh user needs `sudo` without a password, which Raspberry Pi OS gives the user it was set up with.
 
 ## Developing on a Pi that runs the release
 
@@ -110,7 +111,7 @@ The source needs the Python setup from the README's install script on the Pi. It
 
 ## Releasing
 
-1. Set `version` in `pyproject.toml` to the new version and commit it.
+1. Set `version` in `pyproject.toml` to the new version, run `uv lock` so `uv.lock` records it, and commit both.
 2. Build with `./packaging/build.sh`, and test the tarball on the Pi.
 3. Push the commit, then create the GitHub release with the tarball and its checksum. `--target` tags the pushed commit:
    ```
