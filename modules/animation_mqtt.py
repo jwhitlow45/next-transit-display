@@ -5,6 +5,7 @@ Kept free of modules.environment, so the broker settings are passed in.
 """
 
 import logging
+import socket
 from typing import Callable
 
 import paho.mqtt.client as mqtt
@@ -30,7 +31,14 @@ class AnimationListener:
         self._host = host
         self._port = port
         self._submit = submit
-        self._client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv5)
+        # a stable id lets the broker take over the old session when the display reconnects after a hard reset,
+        # publishing the dead connection's offline will before the new online rather than 90 s after it. The
+        # hostname keeps a test run on another machine from taking over the Pi's session
+        self._client = mqtt.Client(
+            callback_api_version=CallbackAPIVersion.VERSION2,
+            client_id=f"transit-display-{socket.gethostname()}",
+            protocol=mqtt.MQTTv5,
+        )
         self._client.username_pw_set(username, password)
         # the broker publishes the will when the connection drops without an MQTT DISCONNECT, which is how the
         # process ends when systemd stops it. Calling disconnect() on shutdown would suppress it, so nothing does

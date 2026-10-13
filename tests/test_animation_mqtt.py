@@ -24,6 +24,18 @@ def _listener(submit=lambda payload: None):
     return listener, client_class.return_value
 
 
+def _client_kwargs():
+    with mock.patch.object(animation_mqtt.mqtt, "Client") as client_class:
+        AnimationListener("broker.local", 1883, "user", "password", lambda payload: None)
+    return client_class.call_args.kwargs
+
+
+class ClientTest(unittest.TestCase):
+    def test_uses_a_stable_client_id_per_host(self):
+        with mock.patch.object(animation_mqtt.socket, "gethostname", return_value="muni-display"):
+            self.assertEqual(_client_kwargs()["client_id"], "transit-display-muni-display")
+
+
 class StartTest(unittest.TestCase):
     def test_sets_the_offline_will_before_connecting(self):
         _, client = _listener()
