@@ -29,8 +29,8 @@ class CanStartTest(unittest.TestCase):
         self.assertFalse(can_start(NOW, arrival, 15, 5, None))
 
     def test_waits_out_the_gap_after_the_last_animation(self):
-        self.assertFalse(can_start(NOW, None, 1, 5, NOW - timedelta(seconds=0.2)))
-        self.assertTrue(can_start(NOW, None, 1, 5, NOW - timedelta(seconds=0.5)))
+        self.assertFalse(can_start(NOW, None, 1, 5, 0.2))
+        self.assertTrue(can_start(NOW, None, 1, 5, 0.5))
 
     def test_cannot_start_once_the_next_arrival_has_passed(self):
         self.assertFalse(can_start(NOW, NOW - timedelta(seconds=1), 1, 5, None))

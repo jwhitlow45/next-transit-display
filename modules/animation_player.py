@@ -68,15 +68,17 @@ def can_start(
     next_arrival_time: datetime | None,
     duration_seconds: float,
     pulse_window_seconds: float,
-    last_end: datetime | None,
+    seconds_since_last_end: float | None,
 ):
     """Whether an event animation of the given duration may start now
 
     It must leave MIN_GAP_SECONDS of transit view after the last one, and must finish before the pulse ahead of
     the next displayed departure. Running across a departure would skip its departure animation, since the next
     pass drops arrivals already in the past. With no displayed arrival, or departures disabled, nothing is due.
+    The gap is measured on the monotonic clock, since the Pi has no real time clock and its wall clock can step
+    back after boot. Arrivals are wall clock times, so the departure check has to stay on the wall clock.
     """
-    if last_end is not None and now < last_end + timedelta(seconds=MIN_GAP_SECONDS):
+    if seconds_since_last_end is not None and seconds_since_last_end < MIN_GAP_SECONDS:
         return False
     if next_arrival_time is None:
         return True

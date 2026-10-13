@@ -75,7 +75,7 @@ class SleepUntilNextFrameTest(unittest.TestCase):
     def test_wakes_when_the_gap_after_the_last_animation_ends(self):
         queue = _queue_with_flash()
         queue.pop_if_startable(lambda duration_seconds: False)
-        last_end = datetime.now(timezone.utc) - timedelta(seconds=0.3)
+        last_end = time.monotonic() - 0.3
         with mock.patch.object(main, "animation_queue", queue):
             start = time.monotonic()
             main.sleep_until_next_frame(None, last_end)

@@ -93,25 +93,28 @@ def start_animation_listener():
     return queue, context
 
 
-def play_startable_animation(matrix, canvas, animation_context, next_arrival_time: datetime | None, last_animation_end: datetime | None):
+def play_startable_animation(matrix, canvas, animation_context, next_arrival_time: datetime | None, last_animation_end: float | None):
     """Plays the next queued event animation if it can start now without running into the next departure
 
+    last_animation_end is a monotonic() time, see can_start
+
     Returns:
-        (canvas, datetime | None, bool): the canvas to keep drawing on, when the last event animation ended, and
-            whether one played
+        (canvas, float | None, bool): the canvas to keep drawing on, the monotonic() time the last event animation
+            ended, and whether one played
     """
     if animation_queue is None:
         return canvas, last_animation_end, False
     now = datetime.now(timezone.utc)
+    seconds_since_last_end = None if last_animation_end is None else monotonic() - last_animation_end
     request = animation_queue.pop_if_startable(
         lambda duration_seconds: can_start(
-            now, next_arrival_time, duration_seconds, env.PULSE_WINDOW_SECONDS, last_animation_end
+            now, next_arrival_time, duration_seconds, env.PULSE_WINDOW_SECONDS, seconds_since_last_end
         )
     )
     if request is None:
         return canvas, last_animation_end, False
     canvas = play_animation(matrix, canvas, request, animation_context)
-    return canvas, datetime.now(timezone.utc), True
+    return canvas, monotonic(), True
 
 
 def stop_visit_sort_key(stop_visit: StopVisitModel):
@@ -299,7 +302,7 @@ def apply_sun_based_brightness(canvas):
     canvas.brightness = brightness
 
 
-def sleep_until_next_frame(next_arrival_time: datetime | None, last_animation_end: datetime | None):
+def sleep_until_next_frame(next_arrival_time: datetime | None, last_animation_end: float | None):
     """Sleeps until the next display refresh or until the soonest displayed arrival is about to hit 0,
     whichever is sooner, waking early enough to pulse the arrival time before its departure animation
 
@@ -317,9 +320,7 @@ def sleep_until_next_frame(next_arrival_time: datetime | None, last_animation_en
 
     # a request waiting only on the gap after the last event animation can start once the gap ends
     if last_animation_end is not None and animation_queue.has_waiting():
-        seconds_until_gap_ends = (
-            last_animation_end + timedelta(seconds=MIN_GAP_SECONDS) - datetime.now(timezone.utc)
-        ).total_seconds()
+        seconds_until_gap_ends = last_animation_end + MIN_GAP_SECONDS - monotonic()
         if seconds_until_gap_ends > 0:
             sleep_seconds = min(sleep_seconds, seconds_until_gap_ends)
     animation_queue.wait_for_new(sleep_seconds)
@@ -495,7 +496,7 @@ def display_loop():
     )
     canvas = matrix.CreateFrameCanvas()
 
-    last_animation_end: datetime | None = None
+    last_animation_end: float | None = None  # monotonic(), see can_start
 
     while True:
         try:
