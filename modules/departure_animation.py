@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from time import monotonic, sleep
 
+from modules.animation_player import FRAMES_PER_SECOND
 from modules.environment import DEPARTURE_ANIMATION_SPRITE_LIST
 from modules.sprites import SPRITE_COLOR_LEGEND, SPRITES_BY_NAME, AnimationDirection, Convoy, build_convoy, draw_convoy
 
 _TRAVEL_DURATION_SECONDS = 2.0
 _ENTRY_EXIT_BUFFER_SECONDS = 0.5  # row fade-out before the convoy enters, settle time after it exits
 DEPARTURE_ANIMATION_DURATION_SECONDS = _TRAVEL_DURATION_SECONDS + 2 * _ENTRY_EXIT_BUFFER_SECONDS
-_FRAMES_PER_SECOND = 30
 _TOW_GAP_PIXELS = 5  # gap between the last vehicle and the row contents it tows
 
 # fail fast at startup on configured sprite names which don't name a sprite, environment.py cannot
@@ -185,6 +185,6 @@ def _play_frames(matrix, canvas, draw_frame):
         draw_frame(canvas, elapsed_seconds)
         canvas = matrix.SwapOnVSync(canvas)
 
-        sleep(1 / _FRAMES_PER_SECOND)
+        sleep(1 / FRAMES_PER_SECOND)
 
     return canvas

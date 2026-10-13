@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-_FRAMES_PER_SECOND = 30
+# shared with the departure animation so every animation on the panel moves at the same rate
+FRAMES_PER_SECOND = 30
 # transit view kept between two event animations, so back-to-back flashes never change colour faster than
 # the flash animation's own 500 ms floor
 MIN_GAP_SECONDS = 0.5
@@ -126,7 +127,7 @@ def play_animation(matrix, canvas, request: AnimationRequest, context: Animation
             canvas.Clear()
             request.animation.draw_frame(canvas, elapsed_seconds, request.params, context)
             canvas = matrix.SwapOnVSync(canvas)
-            wait(1 / _FRAMES_PER_SECOND)
+            wait(1 / FRAMES_PER_SECOND)
     except Exception:
         logger.error(f"Animation {request.animation.name} failed, back to the transit view", exc_info=True)
     return canvas
