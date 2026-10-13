@@ -111,8 +111,8 @@ class AnimationIntakeTest(unittest.TestCase):
             clock.now += 60
             intake.submit(b"not json")
         self.assertEqual(len(logs.output), 2)
-        self.assertIn("Rejected 1 animation", logs.output[0])
-        self.assertIn("Rejected 5 animation", logs.output[1])
+        self.assertIn("(1 since the last report)", logs.output[0])
+        self.assertIn("(5 since the last report)", logs.output[1])
 
     def test_logged_payloads_are_escaped_and_cut(self):
         with self.assertLogs("modules.animation_registry", "WARNING") as logs:

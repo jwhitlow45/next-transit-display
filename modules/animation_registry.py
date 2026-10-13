@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from animations import banner, convoy, flash
 from modules.animation_player import Animation, AnimationRequest
 from modules.animation_queue import AnimationQueue
+from modules.rate_limited_log import RateLimitedLog
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,6 @@ MAX_DURATION_SECONDS = 10.0
 # the Pi reports under-voltage on its normal load and flash adds full-panel fills to it. J accepted that and asked
 # for flash to stay on, setting this False refuses flash requests with a logged reason
 FLASH_ENABLED = True
-_REJECTION_LOG_INTERVAL_SECONDS = 60
 _LOGGED_PAYLOAD_MAX_CHARACTERS = 200
 
 # adding an animation means adding a module to animations/ and a line here
@@ -92,36 +92,21 @@ def parse_request(payload: bytes):
 class AnimationIntake:
     """Validates published payloads and queues the valid ones, logging rejections at most once a minute
 
-    The rate limit keeps a looping or broken publisher from filling the Pi's SD card with log lines. Payloads are
-    logged as a cut repr(), so a crafted newline can't forge a log line either
+    Payloads are logged as a cut repr(), so a crafted newline can't forge a log line
     """
 
     def __init__(self, queue: AnimationQueue, clock=monotonic):
         self._queue = queue
-        self._clock = clock
-        self._last_rejection_logged_at: float | None = None
-        self._unlogged_rejections = 0
+        self._rejection_log = RateLimitedLog(logger, logging.WARNING, clock=clock)
 
     def submit(self, payload: bytes):
         try:
             request = parse_request(payload)
         except RejectedRequest as rejection:
-            self._log_rejection(str(rejection), payload)
+            self._rejection_log.record(
+                f"Rejected an animation request: {rejection}, "
+                f"payload {repr(payload)[:_LOGGED_PAYLOAD_MAX_CHARACTERS]}"
+            )
             return
         if not self._queue.put(request):
             logger.debug(f"Animation request coalesced into an equal one already waiting: {request.animation.name}")
-
-    def _log_rejection(self, reason: str, payload: bytes):
-        self._unlogged_rejections += 1
-        now = self._clock()
-        if (
-            self._last_rejection_logged_at is not None
-            and now - self._last_rejection_logged_at < _REJECTION_LOG_INTERVAL_SECONDS
-        ):
-            return
-        logger.warning(
-            f"Rejected {self._unlogged_rejections} animation request(s) since the last report, latest: {reason}, "
-            f"payload {repr(payload)[:_LOGGED_PAYLOAD_MAX_CHARACTERS]}"
-        )
-        self._last_rejection_logged_at = now
-        self._unlogged_rejections = 0

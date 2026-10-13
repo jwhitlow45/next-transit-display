@@ -11,6 +11,7 @@ from time import monotonic
 from typing import Callable
 
 from modules.animation_player import AnimationRequest
+from modules.rate_limited_log import RateLimitedLog
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,8 @@ class AnimationQueue:
         self._condition = threading.Condition()
         self._generation = 0
         self._seen_generation = 0
+        # a flood of distinct requests drops one per message, so these lines are rate limited like rejections
+        self._skipped_log = RateLimitedLog(logger, logging.INFO, clock=clock)
 
     @property
     def generation(self):
@@ -59,7 +62,7 @@ class AnimationQueue:
                 return False
             if len(self._waiting) >= self._max_requests:
                 dropped = self._waiting.popleft()
-                logger.info(f"Animation queue full, dropped the oldest request: {dropped.request.animation.name}")
+                self._skipped_log.record(f"Animation queue full, dropped the oldest request: {dropped.request.animation.name}")
             self._waiting.append(_WaitingRequest(request, self._clock()))
             self._generation += 1
             self._condition.notify_all()
@@ -91,8 +94,8 @@ class AnimationQueue:
             return None
 
     def _drop_expired(self):
-        """Drops requests older than the TTL, called with the lock held. Arrival order means only the head can be"""
+        """Drops requests older than the TTL, called with the lock held. They arrive in order, so the oldest lead"""
         now = self._clock()
         while self._waiting and now - self._waiting[0].received_at > self._ttl_seconds:
             expired = self._waiting.popleft()
-            logger.info(f"Animation request expired before it could play: {expired.request.animation.name}")
+            self._skipped_log.record(f"Animation request expired before it could play: {expired.request.animation.name}")

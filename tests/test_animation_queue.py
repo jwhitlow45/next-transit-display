@@ -60,6 +60,15 @@ class PutTest(unittest.TestCase):
         self.assertIsNone(queue.pop_if_startable(_always))
 
 
+    def test_a_flood_of_drops_logs_one_line_a_minute(self):
+        clock = _FakeClock()
+        queue = AnimationQueue(max_requests=3, clock=clock)
+        with self.assertLogs("modules.animation_queue", "INFO") as logs:
+            for value in range(10):
+                queue.put(_request(value=value))
+        self.assertEqual(len(logs.output), 1)
+
+
 class PopIfStartableTest(unittest.TestCase):
     def test_pops_in_arrival_order(self):
         queue = AnimationQueue()
