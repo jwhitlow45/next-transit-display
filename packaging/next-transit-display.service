@@ -3,8 +3,9 @@
 [Unit]
 Description=next-transit-display LED matrix transit display
 Wants=network-online.target
-After=network-online.target
-# both drive the same GPIO pins, so starting one stops the other
+# both drive the same GPIO pins, so starting one stops the other. Conflicts= alone doesn't wait for that stop to finish.
+# This After= makes it wait in both directions, since systemd orders a stop before a start whichever way After= points
+After=network-online.target next-transit-display-python.service
 Conflicts=next-transit-display-python.service
 
 [Service]
