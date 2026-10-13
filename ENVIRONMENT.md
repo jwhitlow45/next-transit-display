@@ -52,7 +52,7 @@ LED_MATRIX_PARALLEL="<integer>"
 ```
 LED_MATRIX_GPIO_SLOWDOWN="2"
 ```
-How much to slow the GPIO writes so the panel can keep up. Too low and pixels glitch or ghost. Too high and the refresh rate drops, and a low or uneven refresh rate is what reads as flicker. Measured on a Raspberry Pi 3 Model A+ with the Adafruit bonnet: a slowdown of 10 refreshed anywhere from 107 to 161 Hz, while 2 swung between about 163 and 208 Hz. The library accepts 0 to 10 and defaults to 1. Start at 2 on a Pi 3 or 4 on a Pi 4, and raise it only if pixels glitch.
+How much to slow the GPIO writes so the panel can keep up. Too low and pixels glitch or ghost. Too high and the refresh rate drops, and a low or uneven refresh rate is what reads as flicker. Measured on a Raspberry Pi 3 Model A+ with the Adafruit bonnet: a slowdown of 10 refreshed anywhere from 107 to 161 Hz, while 2 swung between about 163 and 208 Hz. The library accepts 0 to 10 and defaults to 1, or 2 on a Pi 4. Start at 2 on a Pi 3 or 4 on a Pi 4, and raise it only if pixels glitch.
 
 [Hardware mappings](https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/wiring.md#alternative-hardware-mappings)
 ```
