@@ -71,13 +71,36 @@ TEST_ENVIRONMENT = {
 }
 
 
+EMULATOR_CONFIG = {
+    "pixel_outline": 0,
+    "pixel_size": 16,
+    "pixel_style": "square",
+    "pixel_glow": 6,
+    "display_adapter": "browser",
+    "suppress_font_warnings": False,
+    "suppress_adapter_load_errors": True,
+    "browser": {
+        "_comment": "For use with the browser adapter only.",
+        "port": 8888,
+        "target_fps": 24,
+        "fps_display": False,
+        "quality": 70,
+        "image_border": True,
+        "debug_text": False,
+        "image_format": "JPEG",
+    },
+    "log_level": "info",
+}
+
+
 def main():
     with tempfile.TemporaryDirectory() as scratch_dir:
         os.chdir(scratch_dir)
-        # the emulator reads its config from the working directory and otherwise logs a traceback for every
-        # display adapter this machine can't load, burying the test output
+        # the emulator reads its config from the working directory. Without one it logs a traceback for every
+        # display adapter this machine can't load, and a partial one logs a warning for every missing key, both
+        # burying the test output. These are the emulator's own defaults apart from the suppressed load errors
         with open("emulator_config.json", "w") as config_file:
-            json.dump({"suppress_adapter_load_errors": True}, config_file)
+            json.dump(EMULATOR_CONFIG, config_file)
 
         # must happen before anything imports modules.environment
         os.environ.update(TEST_ENVIRONMENT)
