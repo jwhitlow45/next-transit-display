@@ -53,6 +53,8 @@ class AnimationQueue:
     def put(self, request: AnimationRequest):
         """Enqueues a request, returning False when an equal one is already waiting and it was coalesced into it"""
         with self._condition:
+            # expired requests go first, so a repeat is never coalesced into one that is about to be dropped
+            self._drop_expired()
             if any(waiting.request.key == request.key for waiting in self._waiting):
                 return False
             if len(self._waiting) >= self._max_requests:
@@ -83,10 +85,14 @@ class AnimationQueue:
         """
         with self._condition:
             self._seen_generation = self._generation
-            now = self._clock()
-            while self._waiting and now - self._waiting[0].received_at > self._ttl_seconds:
-                expired = self._waiting.popleft()
-                logger.info(f"Animation request expired before it could play: {expired.request.animation.name}")
+            self._drop_expired()
             if self._waiting and can_start(self._waiting[0].request.duration_seconds):
                 return self._waiting.popleft().request
             return None
+
+    def _drop_expired(self):
+        """Drops requests older than the TTL, called with the lock held. Arrival order means only the head can be"""
+        now = self._clock()
+        while self._waiting and now - self._waiting[0].received_at > self._ttl_seconds:
+            expired = self._waiting.popleft()
+            logger.info(f"Animation request expired before it could play: {expired.request.animation.name}")

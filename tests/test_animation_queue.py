@@ -43,6 +43,14 @@ class PutTest(unittest.TestCase):
         self.assertEqual(queue.generation, 1)
         self.assertTrue(queue.put(_request(value=2)))
 
+    def test_a_repeat_of_an_expired_request_is_queued_not_coalesced(self):
+        clock = _FakeClock()
+        queue = AnimationQueue(ttl_seconds=15, clock=clock)
+        queue.put(_request(value=1))
+        clock.now += 20
+        self.assertTrue(queue.put(_request(value=1)))
+        self.assertEqual(queue.pop_if_startable(_always).params.value, 1)
+
     def test_drops_the_oldest_when_full(self):
         queue = AnimationQueue(max_requests=3)
         for value in range(4):
