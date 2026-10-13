@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from functools import cache
+from functools import lru_cache
 
 from modules.display_utils import Colors, cap_if_enabled
 
@@ -215,7 +215,9 @@ class Convoy:
     height: int
 
 
-@cache  # convoys are rebuilt for every departure, and the inputs are a handful of fixed configurations
+# bounded since convoy animation requests choose their own sprites, so the possible inputs come from the network.
+# The departure convoys are two of these and stay cached among the few recent requests
+@lru_cache(maxsize=32)
 def build_convoy(sprite_names: tuple[str, ...], direction: AnimationDirection):
     """Lays out the named sprites as a convoy driving in the given direction, the first name leading
 
