@@ -69,10 +69,13 @@ LED_MATRIX_MAX_BRIGHTNESS="<integer>"
 ```
 LED_MATRIX_PWM_BITS=""
 LED_MATRIX_LIMIT_REFRESH_RATE_HZ=""
+LED_MATRIX_PWM_LSB_NANOSECONDS=""
 ```
-Both optional. `LED_MATRIX_LIMIT_REFRESH_RATE_HZ` caps the refresh rate. Without a cap the rate swings with whatever else the Pi is doing, and those swings read as flicker. A cap a little under what the panel reaches holds it steady: on the Pi 3 Model A+ above, a slowdown of 2 with a 160 Hz cap held 156 to 160 Hz. Defaults to 0, no cap.
+All optional. `LED_MATRIX_LIMIT_REFRESH_RATE_HZ` caps the refresh rate. Without a cap the rate swings with whatever else the Pi is doing, and those swings read as flicker. A cap a little under what the panel reaches holds it steady: on the Pi 3 Model A+ above, a slowdown of 2 with a 160 Hz cap held 156 to 160 Hz. Defaults to 0, no cap.
 
 `LED_MATRIX_PWM_BITS` sets the color depth per channel, 1 to 11. Fewer bits refresh faster, but dim colors band or vanish, which matters for a display that dims at night. Defaults to 11, the library's default.
+
+`LED_MATRIX_PWM_LSB_NANOSECONDS` sets how long the lowest color bit stays lit, in nanoseconds, and every higher bit lasts a doubling of it. Lower values refresh faster, which helps when the CPU runs slow. On the Pi 3 Model A+ above, held at 600 MHz, the default of 130 topped out near 130 Hz, while 80 with a 160 Hz cap averaged 160 Hz. The cost is a dimmer panel at the same brightness, and on some panels ghosting. Defaults to 130, the library's default. The library allows 50 to 3000.
 
 ### Refresh interval variables
 #### REFRESH_API_INTERVAL_SECONDS

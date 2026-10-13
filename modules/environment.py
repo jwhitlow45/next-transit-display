@@ -30,10 +30,13 @@ LED_MATRIX_MAX_BRIGHTNESS = int(os.getenv("LED_MATRIX_MAX_BRIGHTNESS") or -1)
 # the library's own defaults, so a display that doesn't set these refreshes as it always has
 LED_MATRIX_PWM_BITS = int(os.getenv("LED_MATRIX_PWM_BITS") or 11)
 LED_MATRIX_LIMIT_REFRESH_RATE_HZ = int(os.getenv("LED_MATRIX_LIMIT_REFRESH_RATE_HZ") or 0)
+LED_MATRIX_PWM_LSB_NANOSECONDS = int(os.getenv("LED_MATRIX_PWM_LSB_NANOSECONDS") or 130)
 if not 1 <= LED_MATRIX_PWM_BITS <= 11:
     raise ValueError("Environment variable LED_MATRIX_PWM_BITS must be between 1 and 11")
 if LED_MATRIX_LIMIT_REFRESH_RATE_HZ < 0:
     raise ValueError("Environment variable LED_MATRIX_LIMIT_REFRESH_RATE_HZ must be 0 (no cap) or more")
+if not 50 <= LED_MATRIX_PWM_LSB_NANOSECONDS <= 3000:
+    raise ValueError("Environment variable LED_MATRIX_PWM_LSB_NANOSECONDS must be between 50 and 3000")
 
 REFRESH_API_INTERVAL_SECONDS = int(os.getenv("REFRESH_API_INTERVAL_SECONDS") or -1)
 REFRESH_DISPLAY_INTERVAL_SECONDS = int(os.getenv("REFRESH_DISPLAY_INTERVAL_SECONDS") or -1)

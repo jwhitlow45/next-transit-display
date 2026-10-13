@@ -422,6 +422,7 @@ def display_loop():
         matrix_brightness=env.LED_MATRIX_MAX_BRIGHTNESS,
         pwm_bits=env.LED_MATRIX_PWM_BITS,
         limit_refresh_rate_hz=env.LED_MATRIX_LIMIT_REFRESH_RATE_HZ,
+        pwm_lsb_nanoseconds=env.LED_MATRIX_PWM_LSB_NANOSECONDS,
     )
     canvas = matrix.CreateFrameCanvas()
 
