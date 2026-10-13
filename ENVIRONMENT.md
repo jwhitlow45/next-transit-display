@@ -399,13 +399,13 @@ Publish to `transit-display/animations/play` with QoS 0 and without retain, as U
 ```
 | Animation | Params | Duration |
 |:---|:---|:---|
-| `convoy` | `sprites`: 1 to 6 sprite names from DEPARTURE_ANIMATION_SPRITES, leading sprite first. `direction`: `"R"` (default) or `"L"` | 3 s |
+| `convoy` | `sprites`: 1 to 6 of the valid sprite names listed under DEPARTURE_ANIMATION_SPRITES, leading sprite first. `direction`: `"R"` (default) or `"L"` | 3 s |
 | `flash` | `colors`: 1 to 20 `[r, g, b]` triples of integers 0 to 255. `step_ms`: 500 to 2000, default 700. `repeats`: 1 to 4, default 1 | colors × step_ms × repeats |
 | `banner` | `text`: 1 to 47 printable ASCII characters. `color`: `[r, g, b]`, default white | (64 + 5 × characters) ÷ 30 s |
 
 Every animation takes over the whole panel, then the transit view comes back. A request longer than 10 seconds, or one that breaks any of the rules above, is dropped and logged rather than cut short, with rejections logged at most once a minute.
 
-Animations wait their turn: at most 3 wait at once (a fourth drops the oldest), an identical request already waiting is ignored, and a request that hasn't started within 15 seconds is dropped. One never starts if it would still be playing when the next displayed arrival begins its departure pulse, so departures always get their animation. It waits until after the departure instead, or expires.
+Animations wait their turn: at most 3 wait at once (a fourth drops the oldest), an identical request already waiting is ignored, and a request that hasn't started within 15 seconds is dropped. One never starts if it would still be playing when the next displayed arrival begins its departure pulse, so departures keep their animation, except when a data refresh moves an arrival earlier while an animation plays. It waits until after the departure instead, or expires.
 
 `flash` fills the whole panel, so its colors are dimmed until their brightest channel is at most 60 to protect the power supply the panel shares with the Pi. It changes color at most twice a second.
 
