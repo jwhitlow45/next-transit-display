@@ -12,6 +12,7 @@ import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 from paho.mqtt.packettypes import PacketTypes
 from paho.mqtt.properties import Properties
+from paho.mqtt.subscribeoptions import SubscribeOptions
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class AnimationListener:
         self._client.on_connect = self._on_connect
         self._client.on_connect_fail = self._on_connect_fail
         self._client.on_disconnect = self._on_disconnect
+        self._client.on_subscribe = self._on_subscribe
         self._client.on_message = self._on_message
         # the callbacks catch everything themselves. This is a second line, since an exception escaping a
         # callback would end paho's network thread for good with no reconnect
@@ -63,8 +65,13 @@ class AnimationListener:
             if reason_code.is_failure:
                 logger.error(f"Animation listener could not connect to the MQTT broker: {reason_code}")
                 return
-            # on every connect rather than once, so the subscription and status survive reconnects
-            client.subscribe(ANIMATION_TOPIC, qos=0)
+            # on every connect rather than once, so the subscription and status survive reconnects. A retained
+            # message on the topic is never sent, so a publisher that set retain by mistake can't replay an old
+            # animation every time the display reconnects
+            client.subscribe(
+                ANIMATION_TOPIC,
+                options=SubscribeOptions(qos=0, retainHandling=SubscribeOptions.RETAIN_DO_NOT_SEND),
+            )
             client.publish(STATUS_TOPIC, "online", qos=1, retain=True)
             logger.info(f"Animation listener connected to the MQTT broker, listening on {ANIMATION_TOPIC}")
         except Exception:
@@ -76,6 +83,15 @@ class AnimationListener:
             logger.warning(f"Animation listener could not reach the MQTT broker at {self._host}:{self._port}, retrying")
         except Exception:
             logger.error("Animation listener failed handling a connect failure", exc_info=True)
+
+    def _on_subscribe(self, client, userdata, mid, reason_code_list, properties):
+        try:
+            # a refused subscription leaves the listener connected but deaf, for example once the broker has ACLs
+            for reason_code in reason_code_list:
+                if reason_code.is_failure:
+                    logger.error(f"Animation listener's subscription to {ANIMATION_TOPIC} was refused: {reason_code}")
+        except Exception:
+            logger.error("Animation listener failed handling a subscription", exc_info=True)
 
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         try:

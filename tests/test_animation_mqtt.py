@@ -1,6 +1,8 @@
 import unittest
 from unittest import mock
 
+from paho.mqtt.subscribeoptions import SubscribeOptions
+
 import modules.animation_mqtt as animation_mqtt
 from modules.animation_mqtt import ANIMATION_TOPIC, STATUS_TOPIC, AnimationListener
 
@@ -63,8 +65,17 @@ class OnConnectTest(unittest.TestCase):
         client = mock.Mock()
         listener._on_connect(client, None, None, _ReasonCode(False), None)
         listener._on_connect(client, None, None, _ReasonCode(False), None)
-        self.assertEqual(client.subscribe.call_args_list, [mock.call(ANIMATION_TOPIC, qos=0)] * 2)
+        self.assertEqual(client.subscribe.call_count, 2)
+        self.assertEqual(client.subscribe.call_args.args, (ANIMATION_TOPIC,))
         self.assertEqual(client.publish.call_args_list, [mock.call(STATUS_TOPIC, "online", qos=1, retain=True)] * 2)
+
+    def test_never_asks_for_retained_messages(self):
+        listener, _ = _listener()
+        client = mock.Mock()
+        listener._on_connect(client, None, None, _ReasonCode(False), None)
+        options = client.subscribe.call_args.kwargs["options"]
+        self.assertEqual(options.QoS, 0)
+        self.assertEqual(options.retainHandling, SubscribeOptions.RETAIN_DO_NOT_SEND)
 
     def test_a_refused_connect_is_logged_without_subscribing(self):
         listener, _ = _listener()
@@ -102,6 +113,18 @@ class OnMessageTest(unittest.TestCase):
         listener, _ = _listener()
         with self.assertLogs("modules.animation_mqtt", "ERROR"):
             listener._on_message(None, None, object())
+
+
+class OnSubscribeTest(unittest.TestCase):
+    def test_logs_a_refused_subscription(self):
+        listener, _ = _listener()
+        with self.assertLogs("modules.animation_mqtt", "ERROR"):
+            listener._on_subscribe(None, None, 1, [_ReasonCode(True)], None)
+
+    def test_a_granted_subscription_logs_nothing(self):
+        listener, _ = _listener()
+        with self.assertNoLogs("modules.animation_mqtt", "ERROR"):
+            listener._on_subscribe(None, None, 1, [_ReasonCode(False)], None)
 
 
 class OnConnectFailTest(unittest.TestCase):
