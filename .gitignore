@@ -9,3 +9,5 @@ __pycache__/
 
 # Logging
 *.log
+# Release builds, see BUILDING.md
+dist/

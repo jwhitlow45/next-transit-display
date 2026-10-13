@@ -1,0 +1,13 @@
+# The Dockerfile copies only what it names, but Docker receives the whole folder first. This keeps the secrets in .env,
+# the logs and the bulk out of it
+.env
+*.log
+*.log.*
+.git
+.jj
+.venv
+.claude
+dist
+**/__pycache__
+.mypy_cache
+.ruff_cache
