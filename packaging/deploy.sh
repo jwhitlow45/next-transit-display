@@ -36,7 +36,7 @@ if [ "${copy_env}" = "--env" ]; then
   scp .env "${host}:${staging}/.env"
 fi
 
-# Stopped before unpacking, since the running binary can't be overwritten in place. A program that exits at startup,
+# Stopped before unpacking, so the program never runs with a mix of old and new files. A program that exits at startup,
 # such as on a bad .env, shows as activating while systemd waits to restart it, so the last check fails the deploy
 ssh "${host}" "set -e
   sudo mkdir -p ${install_dir}
