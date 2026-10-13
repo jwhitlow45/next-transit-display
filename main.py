@@ -45,14 +45,16 @@ display_info_lock = threading.Lock()
 sunrise_sunset_result: SunriseSunsetResult | None = None
 sunrise_sunset_result_lock = threading.Lock()
 
-# event animations published over MQTT, None while the listener is disabled. Set before the threads start
+# event animations published over MQTT, and what they draw with. None while the listener is disabled. Set before
+# the threads start
 animation_queue: AnimationQueue | None = None
+animation_context: AnimationContext | None = None
 
 
 def main():
-    global animation_queue
+    global animation_queue, animation_context
     if env.ENABLE_ANIMATION_LISTENER == 1:
-        animation_queue = start_animation_listener()
+        animation_queue, animation_context = start_animation_listener()
 
     # daemon threads so the process can exit on Ctrl+C/SIGTERM instead of hanging on the while True loops
     threads = [
@@ -66,14 +68,19 @@ def main():
 
 
 def start_animation_listener():
-    """Starts the MQTT animation listener, returning the queue it fills for the display thread to play from
+    """Starts the MQTT animation listener, returning the queue it fills and the context animations draw with
 
-    Called from main() before the display and API threads start, so a bad import or a missing paho-mqtt exits
-    the process for systemd to restart. Raised inside display_loop it would end that thread alone and leave a
-    dark panel. The imports live here so a display with the listener off never loads paho or the animations.
+    Called from main() before the display and API threads start, so a bad import, a missing paho-mqtt or a missing
+    font exits the process for systemd to restart. Raised inside display_loop it would end that thread alone and
+    leave a dark panel. The imports live here so a display with the listener off never loads paho or the animations.
     """
     from modules.animation_mqtt import AnimationListener
     from modules.animation_registry import AnimationIntake
+
+    # banners always use the 5x7 font, whatever FONT is, so the contract's banner timing holds
+    font_5x7 = graphics.Font()
+    font_5x7.LoadFont(path.join("fonts", "5x7.bdf"))
+    context = AnimationContext(font_5x7, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
 
     queue = AnimationQueue()
     AnimationListener(
@@ -83,7 +90,7 @@ def start_animation_listener():
         env.ANIMATION_MQTT_PASSWORD,
         AnimationIntake(queue).submit,
     ).start()
-    return queue
+    return queue, context
 
 
 def play_startable_animation(matrix, canvas, animation_context, next_arrival_time: datetime | None, last_animation_end: datetime | None):
@@ -488,14 +495,7 @@ def display_loop():
     )
     canvas = matrix.CreateFrameCanvas()
 
-    # event animations always draw banners in the 5x7 font, whatever FONT is, so the contract's banner timing
-    # holds. Loaded only with the listener on, so a display with it off takes exactly today's path
-    animation_context: AnimationContext | None = None
     last_animation_end: datetime | None = None
-    if animation_queue is not None:
-        font_5x7 = graphics.Font()
-        font_5x7.LoadFont(path.join("fonts", "5x7.bdf"))
-        animation_context = AnimationContext(font_5x7, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
 
     while True:
         try:

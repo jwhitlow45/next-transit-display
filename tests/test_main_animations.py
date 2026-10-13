@@ -82,6 +82,29 @@ class SleepUntilNextFrameTest(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 1)
 
 
+class StartAnimationListenerTest(unittest.TestCase):
+    def test_loads_the_5x7_font_before_connecting(self):
+        repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        test_dir = os.getcwd()
+        os.chdir(repo_dir)  # the font path is relative to the display's working directory
+        try:
+            with mock.patch("modules.animation_mqtt.AnimationListener") as listener_class:
+                queue, context = main.start_animation_listener()
+        finally:
+            os.chdir(test_dir)
+        listener_class.return_value.start.assert_called_once()
+        self.assertIsInstance(queue, AnimationQueue)
+        self.assertEqual((context.width, context.height), (64, 32))
+        self.assertIsNotNone(context.font_5x7)
+
+    def test_a_missing_font_fails_at_startup_before_connecting(self):
+        # the test runner's scratch directory has no fonts/ folder
+        with mock.patch("modules.animation_mqtt.AnimationListener") as listener_class:
+            with self.assertRaises(Exception):
+                main.start_animation_listener()
+        listener_class.return_value.start.assert_not_called()
+
+
 class ListenerSettingsTest(unittest.TestCase):
     def test_enabling_the_listener_requires_broker_settings(self):
         # environment.py validates at import, so check it in a fresh interpreter
