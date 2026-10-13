@@ -1,0 +1,20 @@
+# systemd unit for the prebuilt binary, see BUILDING.md. It assumes the release was unpacked to
+# /opt/next-transit-display, with the .env file beside the binary
+[Unit]
+Description=next-transit-display LED matrix transit display
+Wants=network-online.target
+After=network-online.target
+# both drive the same GPIO pins, so starting one stops the other
+Conflicts=next-transit-display-python.service
+
+[Service]
+# root, since the LED matrix library needs direct access to the GPIO pins
+User=root
+# the program reads .env and fonts/ from, and writes transit-display.log to, its working directory
+WorkingDirectory=/opt/next-transit-display
+ExecStart=/opt/next-transit-display/next-transit-display
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

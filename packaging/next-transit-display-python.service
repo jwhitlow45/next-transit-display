@@ -1,0 +1,18 @@
+# systemd unit for development: runs the Python source synced to the Pi with rsync, see BUILDING.md. Starting it stops
+# the release binary's service and the other way around. It has no [Install] section, so it can't be enabled and the Pi
+# always boots into the release. Edit the two paths if the source lives somewhere other than
+# /home/muni/next-transit-display
+[Unit]
+Description=next-transit-display from the Python source, for development
+Wants=network-online.target
+After=network-online.target
+Conflicts=next-transit-display.service
+
+[Service]
+# root, since the LED matrix library needs direct access to the GPIO pins
+User=root
+WorkingDirectory=/home/muni/next-transit-display
+# -B so no __pycache__ owned by root gets in the way of the next rsync
+ExecStart=/usr/bin/python3 -B /home/muni/next-transit-display/main.py
+Restart=always
+RestartSec=5
