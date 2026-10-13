@@ -420,6 +420,8 @@ def display_loop():
         gpio_slowdown=env.LED_MATRIX_GPIO_SLOWDOWN,
         hardware_mapping=env.LED_MATRIX_HARDWARE_MAPPING,
         matrix_brightness=env.LED_MATRIX_MAX_BRIGHTNESS,
+        pwm_bits=env.LED_MATRIX_PWM_BITS,
+        limit_refresh_rate_hz=env.LED_MATRIX_LIMIT_REFRESH_RATE_HZ,
     )
     canvas = matrix.CreateFrameCanvas()
 
