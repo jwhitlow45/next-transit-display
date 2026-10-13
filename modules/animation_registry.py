@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 CONTRACT_VERSION = 1
 PAYLOAD_MAX_BYTES = 4096
 MAX_DURATION_SECONDS = 10.0
-# the Pi reports under-voltage on its normal load and flash adds full-panel fills to it. J accepted that and asked
-# for flash to stay on, setting this False refuses flash requests with a logged reason
+# the Pi reports under-voltage on its normal load and flash adds full-panel fills to it. The owner accepted that
+# and kept flash on, setting this False refuses flash requests with a logged reason
 FLASH_ENABLED = True
 _LOGGED_PAYLOAD_MAX_CHARACTERS = 200
 
@@ -46,7 +46,8 @@ class _Envelope(BaseModel):
 
 
 def _describe_errors(err: ValidationError):
-    # locations only, never pydantic's messages, which quote the publisher's input into the log
+    # locations only, repr-escaped: an unknown key's name is publisher input, and pydantic's messages would add the
+    # publisher's values too
     return repr([".".join(str(part) for part in error["loc"]) for error in err.errors()])
 
 
