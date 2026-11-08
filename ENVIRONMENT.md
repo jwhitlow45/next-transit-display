@@ -402,7 +402,7 @@ These let other programs play short animations on the display by publishing to a
 ```
 ENABLE_ANIMATION_LISTENER="<0|1>"
 ```
-Enables the listener. Defaults to 0 (disabled), and a display with it disabled behaves exactly as it does without the feature. When it is 1, `ANIMATION_MQTT_HOST`, `ANIMATION_MQTT_USERNAME`, and `ANIMATION_MQTT_PASSWORD` are required, and `paho-mqtt` must be installed (see the setup script).
+Enables the listener. Defaults to 0 (disabled), and a display with it disabled behaves exactly as it does without the feature. When it is 1, `ANIMATION_MQTT_HOST`, `ANIMATION_MQTT_USERNAME`, and `ANIMATION_MQTT_PASSWORD` are required, and `paho-mqtt` must be available: the prebuilt binary bundles it, and when running from source the setup script installs it.
 
 #### ANIMATION_MQTT_HOST, ANIMATION_MQTT_PORT, ANIMATION_MQTT_USERNAME, ANIMATION_MQTT_PASSWORD
 ```
