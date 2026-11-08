@@ -36,6 +36,7 @@ COPY main.py ./
 COPY models ./models
 COPY modules ./modules
 COPY services ./services
+COPY animations ./animations
 
 # RGBMatrixEmulator is the development stand-in for the real library and never ships. _json is the C accelerator
 # for the json module, which Nuitka otherwise leaves out and falls back to pure Python. The cache mount keeps Nuitka's
