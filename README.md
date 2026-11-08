@@ -69,8 +69,10 @@ Configure environment variables which are in [ENVIRONMENT.md](ENVIRONMENT.md).
 #### Deploying changes
 I found it simple enough to use rsync and scp to send files from my local machine to my Pi after making changes. The following command executed from the root of the repo accomplishes that:
 ```
-rsync -aPh --delete --filter=':- .gitignore' --exclude=.git/ . <user>@<host>:<path-to-remote-project> && scp .env <user>@<host>:<path-to-remote-project>/.env
+rsync -aPh --delete --filter=':- .gitignore' --exclude=.git/ --exclude=.env --exclude='*.log*' --exclude=.venv/ --exclude=__pycache__/ --exclude=.ruff_cache/ --exclude=.mypy_cache/ . <user>@<host>:<path-to-remote-project> && scp .env <user>@<host>:<path-to-remote-project>/.env && ssh -t <user>@<host> 'cd <path-to-remote-project> && sudo /root/.local/bin/uv pip install --system --break-system-packages -r pyproject.toml'
 ```
+The explicit excludes repeat `.gitignore` on purpose. macOS ships `openrsync`, and it misreads that filter: without them the Pi's log is overwritten by your local one, and its `.env` is deleted before `scp` puts it back. The last step installs any dependency added since the last deploy, the same way the setup script does. Skipping it after a new dependency leaves the program crashing on startup with a `ModuleNotFoundError`.
+
 As always use whatever workflow works for you.
 
 #### Executing changes
@@ -82,5 +84,9 @@ sudo python3 -B main.py
 There is also support for a `LOG_LEVEL` environment variable supporting the usual `fatal|error|warning|info|debug` log levels. I'll be honest I kinda chucked in debug statements wherever I thought they would be helpful without thinking about traceability. I've never been a super low-level engineer so I have little to no experience writing professional debug logs. The option is there though.
 
 #### Testing
-This project didn't feel significant enough to warrant a test suite implementation. I'm not a Python developer and this already took me quite a while to design to be as robust as it is. Feel free to write tests for the code and PR them. I'm not going to.
+Tests use the standard library's `unittest`, so the local environment set up by `uv sync` is all they need. Run them from the root of the repo:
+```
+uv run python tests/run.py
+```
+The runner works from a scratch directory and sets every environment variable itself, so your `.env` and log file are never read or written. Tests draw onto a stand-in canvas from `tests/fakes.py`, so no matrix or emulator window is needed.
 

@@ -65,12 +65,22 @@ def cap_color_luminance(color: tuple[int, int, int], luminance_cap: int):
     return (round(color[0] * scale), round(color[1] * scale), round(color[2] * scale))
 
 
+def cap_if_enabled(color: tuple[int, int, int]):
+    """Caps a color to COLOR_LUMINANCE_CAP, or returns it unchanged when the cap is disabled (0)
+
+    Every color the display draws goes through this rather than cap_color_luminance directly, since a cap of 0
+    means disabled while cap_color_luminance(color, 0) would turn every lit color black
+    """
+    if COLOR_LUMINANCE_CAP == 0:
+        return color
+    return cap_color_luminance(color, COLOR_LUMINANCE_CAP)
+
+
 # dim every palette color brighter than the configured cap so no color visually overpowers another,
 # e.g. full white drives all three sub-LEDs and reads several times brighter than full red or blue
-if COLOR_LUMINANCE_CAP > 0:
-    for _color_name, _color in list(vars(Colors).items()):
-        if isinstance(_color, tuple):
-            setattr(Colors, _color_name, cap_color_luminance(_color, COLOR_LUMINANCE_CAP))
+for _color_name, _color in list(vars(Colors).items()):
+    if isinstance(_color, tuple):
+        setattr(Colors, _color_name, cap_if_enabled(_color))
 
 # fail fast at startup on configured color names which don't name a color above, environment.py cannot
 # validate these itself without a circular import
