@@ -37,6 +37,7 @@ SPRITE_COLOR_LEGEND = {
     "E": cap_if_enabled((0, 110, 0)),  # creeper mottling
     "Z": cap_if_enabled((0, 150, 90)),  # zombie skin
     "T": Colors.CYAN,  # zombie shirt
+    "A": cap_if_enabled((255, 120, 0)),  # pumpkin orange, as "O" is too deep to read as orange beside red
 }
 
 # NOTE: sprites are 7 pixels tall to fill one row of a 7 pixel tall font, taller fonts leave headroom
@@ -166,6 +167,52 @@ _CREEPER_SPRITE = [
     "EG.GE",
 ]
 
+# thanksgiving turkey, side on and facing its direction of travel: a fanned tail of red, orange, and yellow
+# feathers behind a brown body, a red head and wattle, and a yellow beak. As tall as a row, so it walks the road
+_TURKEY_SPRITE = [
+    ".RAY.....RR.",
+    "RAYHH....RRY",
+    "RAYHHHHHHRR.",
+    "RAYHHHHHHH..",
+    ".RAHHHHHHH..",
+    "..RHHHHHH...",
+    "....Y..Y....",
+]
+
+# thanksgiving mayflower: two masts of cream sails with red pennants, a bowsprit out front, and a brown hull
+# with a raised stern, sailing on a strip of blue water where the other sprites have wheels
+_MAYFLOWER_SPRITE = [
+    "....R...R....",
+    "...CCC.CCC...",
+    "...CCC.CCC..K",
+    "HH..K...K..K.",
+    "HHHHHHHHHHHH.",
+    ".HHHHHHHHHH..",
+    "..BBBBBBBBB..",
+]
+
+# thanksgiving pumpkin pie, a slice side on with its point leading: orange filling and a dollop of cream on a
+# brown crust. Shorter than a row, so it slides along the road below the tops of the taller sprites
+_PUMPKIN_PIE_SPRITE = [
+    ".CC.........",
+    "HAAAA.......",
+    "HAAAAAAA....",
+    "HAAAAAAAAAA.",
+    "HHHHHHHHHHHH",
+]
+
+# thanksgiving autumn leaf on its stem, orange with a red vein and yellow tips, bottom rows left transparent so
+# it blows along above the road like the bat
+_AUTUMN_LEAF_SPRITE = [
+    "...Y...",
+    "Y.YAY.Y",
+    "AAARAAA",
+    ".AARAA.",
+    "...K...",
+    ".......",
+    ".......",
+]
+
 # these keys are the names DEPARTURE_ANIMATION_SPRITES and the convoy animation accept, keep ENVIRONMENT.md's
 # list of valid sprite names in sync
 SPRITES_BY_NAME = {
@@ -180,6 +227,10 @@ SPRITES_BY_NAME = {
     "PIG": _PIG_SPRITE,
     "COW": _COW_SPRITE,
     "CREEPER": _CREEPER_SPRITE,
+    "TURKEY": _TURKEY_SPRITE,
+    "MAYFLOWER": _MAYFLOWER_SPRITE,
+    "PUMPKIN_PIE": _PUMPKIN_PIE_SPRITE,
+    "AUTUMN_LEAF": _AUTUMN_LEAF_SPRITE,
 }
 
 

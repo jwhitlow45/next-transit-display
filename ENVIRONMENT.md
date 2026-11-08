@@ -267,13 +267,15 @@ Optional comma-separated list of the sprites making up the departure animation's
 
 Valid sprite names:
 ```
-BUS STREETCAR SUBWAY_CAR GHOST_BUS PUMPKIN_COACH HEARSE BAT CHICKEN_JOCKEY PIG COW CREEPER
+BUS STREETCAR SUBWAY_CAR GHOST_BUS PUMPKIN_COACH HEARSE BAT CHICKEN_JOCKEY PIG COW CREEPER TURKEY MAYFLOWER PUMPKIN_PIE AUTUMN_LEAF
 ```
 Names are case sensitive. Spaces around them are ignored. An unknown name stops the display at startup with an error listing the valid names.
 
 `GHOST_BUS`, `PUMPKIN_COACH`, `HEARSE`, and `BAT` are Halloween themed. The bat flies above the road line rather than driving along it.
 
 `CHICKEN_JOCKEY`, `PIG`, `COW`, and `CREEPER` are Minecraft themed. The creeper faces you, since its face is what makes it a creeper.
+
+`TURKEY`, `MAYFLOWER`, `PUMPKIN_PIE`, and `AUTUMN_LEAF` are Thanksgiving themed. The turkey and the Mayflower fill the row, the pie slice is shorter and slides along the road with its point leading, and the leaf blows along above the road like the bat. Like every sprite they face their direction of travel, so on a right-to-left line they are mirrored.
 
 Every pass of the animation takes the same amount of time, so longer convoys drive faster.
 
@@ -285,6 +287,11 @@ DEPARTURE_ANIMATION_SPRITES="BAT,HEARSE,PUMPKIN_COACH,GHOST_BUS"
 Example Minecraft convoy, a chicken jockey leading a pig, a cow, and a creeper:
 ```
 DEPARTURE_ANIMATION_SPRITES="CHICKEN_JOCKEY,PIG,COW,CREEPER"
+```
+
+Example Thanksgiving convoy, a leaf blowing ahead of a turkey fleeing the Mayflower, with a slice of pie bringing up the rear:
+```
+DEPARTURE_ANIMATION_SPRITES="AUTUMN_LEAF,TURKEY,MAYFLOWER,PUMPKIN_PIE"
 ```
 
 #### Departure pulse configuration (optional)

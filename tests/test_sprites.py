@@ -28,6 +28,10 @@ class SpriteNamesTest(unittest.TestCase):
                 "PIG",
                 "COW",
                 "CREEPER",
+                "TURKEY",
+                "MAYFLOWER",
+                "PUMPKIN_PIE",
+                "AUTUMN_LEAF",
             ],
         )
 
@@ -91,6 +95,16 @@ class DrawConvoyTest(unittest.TestCase):
         draw_convoy(canvas, build_convoy(("BAT",), AnimationDirection.LEFT_TO_RIGHT), 0, road_y_pos=20)
         # the bat's bottom three rows are empty, so it flies three pixels above the road
         self.assertEqual(max(y for _, y in canvas.pixels), 16)
+
+    def test_thanksgiving_leaf_flies_and_pie_rides_low(self):
+        canvas = FakeCanvas()
+        draw_convoy(canvas, build_convoy(("AUTUMN_LEAF",), AnimationDirection.LEFT_TO_RIGHT), 0, road_y_pos=20)
+        # the leaf's bottom two rows are empty, so it blows along two pixels above the road
+        self.assertEqual(max(y for _, y in canvas.pixels), 17)
+        canvas = FakeCanvas()
+        draw_convoy(canvas, build_convoy(("PUMPKIN_PIE",), AnimationDirection.LEFT_TO_RIGHT), 0, road_y_pos=20)
+        # the pie slice is five rows, so it sits on the road two rows lower than a full-height sprite's top
+        self.assertEqual((min(y for _, y in canvas.pixels), max(y for _, y in canvas.pixels)), (15, 19))
 
 
 if __name__ == "__main__":
