@@ -275,7 +275,7 @@ Names are case sensitive. Spaces around them are ignored. An unknown name stops 
 
 `CHICKEN_JOCKEY`, `PIG`, `COW`, and `CREEPER` are Minecraft themed. The creeper faces you, since its face is what makes it a creeper.
 
-`TURKEY`, `MAYFLOWER`, `PUMPKIN_PIE`, and `AUTUMN_LEAF` are Thanksgiving themed. The turkey and the Mayflower fill the row, the pie slice is shorter and slides along the road with its point leading, and the leaf blows along above the road like the bat. Like every sprite they face their direction of travel, so on a right-to-left line they are mirrored.
+`TURKEY`, `MAYFLOWER`, `PUMPKIN_PIE`, and `AUTUMN_LEAF` are Thanksgiving themed. The turkey and the Mayflower fill the row, the pie slice is shorter and slides along the road with its point leading, and the leaf blows along above the road like the bat. Like the other animals and vehicles they face their direction of travel, so on a right-to-left line they are mirrored.
 
 Every pass of the animation takes the same amount of time, so longer convoys drive faster.
 

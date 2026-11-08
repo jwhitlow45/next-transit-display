@@ -179,13 +179,13 @@ _TURKEY_SPRITE = [
     "....Y..Y....",
 ]
 
-# thanksgiving mayflower: two masts of cream sails with red pennants, a bowsprit out front, and a brown hull
+# thanksgiving mayflower: two wooden masts of cream sails with red pennants, a bowsprit out front, and a brown hull
 # with a raised stern, sailing on a strip of blue water where the other sprites have wheels
 _MAYFLOWER_SPRITE = [
     "....R...R....",
     "...CCC.CCC...",
-    "...CCC.CCC..K",
-    "HH..K...K..K.",
+    "...CCC.CCC..H",
+    "HH..H...H..H.",
     "HHHHHHHHHHHH.",
     ".HHHHHHHHHH..",
     "..BBBBBBBBB..",
@@ -201,14 +201,14 @@ _PUMPKIN_PIE_SPRITE = [
     "HHHHHHHHHHHH",
 ]
 
-# thanksgiving autumn leaf on its stem, orange with a red vein and yellow tips, bottom rows left transparent so
-# it blows along above the road like the bat
+# thanksgiving autumn leaf, tilted as it blows along with a deep orange midrib running down into its stem, bottom
+# rows left transparent so it flies above the road like the bat
 _AUTUMN_LEAF_SPRITE = [
-    "...Y...",
-    "Y.YAY.Y",
-    "AAARAAA",
-    ".AARAA.",
-    "...K...",
+    "...AAY.",
+    "..AAOA.",
+    ".AAOAA.",
+    ".AOAA..",
+    ".H.....",
     ".......",
     ".......",
 ]
