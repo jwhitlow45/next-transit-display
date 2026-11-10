@@ -31,7 +31,12 @@ class TransitTripUpdatesResponse:
                 gtfs_realtime_pb2.TripDescriptor.DELETED,
             ):
                 continue
-            for stop_time_update in entity.trip_update.stop_time_update:
+            # A trip that hasn't started lists its first stop with only a departure time, and drops that stop once
+            # the bus pulls away. So an arrival time on the first listed stop means the bus is on its way. Unlike
+            # stop_sequence == 1, this holds for the few trips whose first stop isn't numbered 1
+            stop_time_update_list = entity.trip_update.stop_time_update
+            en_route = len(stop_time_update_list) > 0 and stop_time_update_list[0].arrival.HasField("time")
+            for stop_time_update in stop_time_update_list:
                 if (
                     stop_time_update.stop_id not in display_info_dict
                     or stop_time_update.schedule_relationship == gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.SKIPPED
@@ -49,6 +54,7 @@ class TransitTripUpdatesResponse:
                     DisplayInfoModels.StopVisitModel(
                         line_reference=trip.route_id,
                         expected_arrival_time=datetime.fromtimestamp(stop_time_event.time, timezone.utc),
+                        en_route=en_route,
                     )
                 )
         return display_info_dict
