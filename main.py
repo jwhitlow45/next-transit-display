@@ -685,7 +685,11 @@ def fetch_vehicle_positions(client: OpenData511Client) -> TransitVehiclePosition
     try:
         return client.get_transit_vehicle_positions(env.OPEN_DATA_511_AGENCY_ID)
     except HTTPStatusError as err:
-        # a rejected key fails the trip updates requests too, which stop the program, so this only logs
+        # fail program on 401 like the trip updates requests do. With a key count divisible by 3, the same keys
+        # always get the vehicle positions requests, so a rejected one would never reach the trip updates check
+        if err.response.status_code == 401:
+            logger.error(f"API key rejected for vehicle positions: 401 {err.response.text}")
+            os._exit(1)
         logger.error(f"API Request Failed for vehicle positions: {err.response.status_code} {err.response.text}")
     except Exception:
         logger.error("Unexpected exception while trying to fetch vehicle positions...continuing", exc_info=True)

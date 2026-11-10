@@ -19,10 +19,9 @@ def is_en_route(
     """Whether the bus running a trip has left the first stop of its route
 
     The vehicle's own position decides when the vehicle positions feed has one for the trip. The trip updates feed
-    gets the start of a route wrong both ways: it drops the stop a bus is standing at, so a late bus still boarding at
-    its first stop already looks gone, and it can predict a bus running far behind from mid-route while the bus is
-    still driving to the start. Without a vehicle, the trip updates feed is all there is: a trip that hasn't started
-    lists its first stop with only a departure time, and drops that stop once the bus pulls away
+    drops the stop a bus is standing at, so a late bus still boarding at its first stop already looks gone there, and
+    it can also lag a bus that has just left. Without a vehicle, the trip updates feed is all there is: a trip that
+    hasn't started lists its first stop with only a departure time, and drops that stop once the bus pulls away
 
     remembered_first_stop_sequence is the trip's first stop from an earlier refresh, see
     TransitTripUpdatesResponse.remember_first_stop_sequences
@@ -30,7 +29,9 @@ def is_en_route(
     if len(stop_time_update_list) == 0:
         return False
     first_listed = stop_time_update_list[0]
-    if vehicle_stop_sequence is None:
+    # As a bus nears the last stop of its trip, the vehicle positions feed numbers that stop 1, most likely as the
+    # first stop of the bus's next trip. So a trip down to its last stop is en route whatever the vehicle says
+    if vehicle_stop_sequence is None or len(stop_time_update_list) == 1:
         return first_listed.arrival.HasField("time")
     if lists_first_stop(stop_time_update_list):
         first_stop_sequence = first_listed.stop_sequence

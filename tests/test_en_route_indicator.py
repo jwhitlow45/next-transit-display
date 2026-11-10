@@ -3,6 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
+import httpx
 from fakes import FakeCanvas, FakeMatrix
 from google.transit import gtfs_realtime_pb2
 
@@ -108,11 +109,10 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         trip = [(2, "second", soon, soon), (6, _STOP, soon + timedelta(minutes=5), None)]
         self.assertFalse(self._en_route(trip, {"0": 1}))
 
-    def test_a_bus_still_driving_to_the_start_is_not_en_route(self):
-        # running far behind, the trip updates feed predicts it from mid-route
-        soon = _NOW + timedelta(minutes=1)
-        trip = [(44, "mid-route", soon, soon), (50, _STOP, soon + timedelta(minutes=5), None)]
-        self.assertFalse(self._en_route(trip, {"0": 1}))
+    def test_a_bus_nearing_its_last_stop_stays_en_route(self):
+        # the vehicle positions feed numbers the last stop 1 as the bus nears it
+        trip = [(50, _STOP, _NOW + timedelta(minutes=1), None)]
+        self.assertTrue(self._en_route(trip, {"0": 1}))
 
     def test_a_bus_past_its_first_stop_is_en_route_before_the_trip_updates_feed_catches_up(self):
         leaves = _NOW + timedelta(seconds=50)
@@ -188,6 +188,28 @@ class VehiclePositionsTest(unittest.TestCase):
         self.assertEqual(main.get_fresh_vehicle_stop_sequence_dict(fresh), {"a": 3})
         self.assertIsNone(main.get_fresh_vehicle_stop_sequence_dict(stale))
         self.assertIsNone(main.get_fresh_vehicle_stop_sequence_dict(None))
+
+
+class VehiclePositionsFetchTest(unittest.TestCase):
+    def _fetch_failing_with(self, status_code):
+        request = httpx.Request("GET", "https://api.511.org/transit/vehiclepositions")
+        response = httpx.Response(status_code, request=request, text="failed")
+        client = mock.Mock()
+        client.get_transit_vehicle_positions.side_effect = httpx.HTTPStatusError(
+            str(status_code), request=request, response=response
+        )
+        with mock.patch.object(main.os, "_exit") as exit_program:
+            result = main.fetch_vehicle_positions(client)
+        return result, exit_program
+
+    def test_a_rejected_key_stops_the_program(self):
+        _, exit_program = self._fetch_failing_with(401)
+        exit_program.assert_called_once_with(1)
+
+    def test_other_failures_keep_the_last_positions(self):
+        result, exit_program = self._fetch_failing_with(503)
+        self.assertIsNone(result)
+        exit_program.assert_not_called()
 
 
 class _StopLoop(Exception):
