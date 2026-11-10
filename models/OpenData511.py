@@ -5,26 +5,32 @@ from google.transit import gtfs_realtime_pb2
 import models.DisplayInfo as DisplayInfoModels
 
 
-def lists_first_stop(stop_time_update_list):
-    """Whether a trip still lists the first stop of its route, which the trip feed gives only a departure time"""
-    if len(stop_time_update_list) == 0:
-        return False
-    first_listed = stop_time_update_list[0]
-    return first_listed.departure.HasField("time") and not first_listed.arrival.HasField("time")
+def get_starting_stop_sequence(stop_time_update_list) -> int | None:
+    """The stop_sequence a trip that hasn't started sets off from, or None once the trip updates feed shows it started
+
+    A trip that hasn't started lists its first stop with only a departure time. Some route 9 trips also list their
+    second stop that way, where the bus holds before setting off, so a trip sets off from the last of those stops
+    """
+    starting_stop_sequence = None
+    for stop_time_update in stop_time_update_list:
+        if stop_time_update.arrival.HasField("time") or not stop_time_update.departure.HasField("time"):
+            break
+        starting_stop_sequence = stop_time_update.stop_sequence
+    return starting_stop_sequence
 
 
 def is_en_route(
-    stop_time_update_list, vehicle_stop_sequence: int | None, remembered_first_stop_sequence: int | None = None
+    stop_time_update_list, vehicle_stop_sequence: int | None, remembered_starting_stop_sequence: int | None = None
 ):
-    """Whether the bus running a trip has left the first stop of its route
+    """Whether the bus running a trip has set off from the start of its route
 
     The vehicle's own position decides when the vehicle positions feed has one for the trip. The trip updates feed
     drops the stop a bus is standing at, so a late bus still boarding at its first stop already looks gone there, and
     it can also lag a bus that has just left. Without a vehicle, the trip updates feed is all there is: a trip that
     hasn't started lists its first stop with only a departure time, and drops that stop once the bus pulls away
 
-    remembered_first_stop_sequence is the trip's first stop from an earlier refresh, see
-    TransitTripUpdatesResponse.remember_first_stop_sequences
+    remembered_starting_stop_sequence is the trip's starting stop from an earlier refresh, see
+    TransitTripUpdatesResponse.remember_starting_stop_sequences
     """
     if len(stop_time_update_list) == 0:
         return False
@@ -33,17 +39,16 @@ def is_en_route(
     # first stop of the bus's next trip. So a trip down to its last stop is en route whatever the vehicle says
     if vehicle_stop_sequence is None or len(stop_time_update_list) == 1:
         return first_listed.arrival.HasField("time")
-    if lists_first_stop(stop_time_update_list):
-        first_stop_sequence = first_listed.stop_sequence
-    elif remembered_first_stop_sequence is not None:
-        first_stop_sequence = remembered_first_stop_sequence
-    else:
-        # A trip first seen after it dropped its first stop, which only happens to trips already running when the
-        # display starts. Its first stop is taken to be 1, which the agency's trips start at all but a handful of
-        # times. Taking the stop before the first listed one instead would blink the marker off at every stop such
-        # a bus makes until its trip ends
-        first_stop_sequence = 1
-    return vehicle_stop_sequence > first_stop_sequence
+    starting_stop_sequence = get_starting_stop_sequence(stop_time_update_list)
+    if starting_stop_sequence is None:
+        starting_stop_sequence = remembered_starting_stop_sequence
+    if starting_stop_sequence is None:
+        # A trip first seen after it dropped its starting stop, which only happens to trips already running when the
+        # display starts. It is taken to set off from stop 1, as the agency's trips do apart from the route 9 trips
+        # that hold at stop 2, so after a restart such a bus holding at stop 2 can be marked early. Taking the stop
+        # before the first listed one instead would blink the marker off at every stop such a bus makes
+        starting_stop_sequence = 1
+    return vehicle_stop_sequence > starting_stop_sequence
 
 
 class TransitVehiclePositionsResponse:
@@ -69,33 +74,35 @@ class TransitTripUpdatesResponse:
         self.feed_message = gtfs_realtime_pb2.FeedMessage()
         self.feed_message.ParseFromString(content)
 
-    def remember_first_stop_sequences(self, first_stop_sequence_dict: dict[str, int]):
-        """Records, in place, the first stop of every trip that still lists it, and forgets trips no longer in the feed
+    def remember_starting_stop_sequences(self, starting_stop_sequence_dict: dict[str, int]):
+        """Records, in place, the latest starting stop of every trip that still lists one, and forgets trips no longer
+        in the feed
 
-        The feed drops a trip's first stop, and its number with it, once the bus boards there or leaves. A handful of
-        trips start at a stop numbered other than 1, so is_en_route needs the number remembered from before
+        The feed drops a trip's starting stop, and its number with it, once the bus boards there or leaves. The route 9
+        trips that hold at stop 2 list stop 1 first and stop 2 once stop 1 is dropped, so the latest one is kept
         """
         trip_id_set = set()
         for entity in self.feed_message.entity:
             trip_id = entity.trip_update.trip.trip_id
             trip_id_set.add(trip_id)
-            if lists_first_stop(entity.trip_update.stop_time_update):
-                first_stop_sequence_dict[trip_id] = entity.trip_update.stop_time_update[0].stop_sequence
-        for trip_id in list(first_stop_sequence_dict):
+            starting_stop_sequence = get_starting_stop_sequence(entity.trip_update.stop_time_update)
+            if starting_stop_sequence is not None:
+                starting_stop_sequence_dict[trip_id] = starting_stop_sequence
+        for trip_id in list(starting_stop_sequence_dict):
             if trip_id not in trip_id_set:
-                del first_stop_sequence_dict[trip_id]
+                del starting_stop_sequence_dict[trip_id]
 
     def convert_to_display_info_dict(
         self,
         stopcode_list: list[str],
         vehicle_stop_sequence_dict: dict[str, int] | None = None,
-        first_stop_sequence_dict: dict[str, int] | None = None,
+        starting_stop_sequence_dict: dict[str, int] | None = None,
     ):
         """Collects the predicted visits to each given stopcode from every trip in the feed
 
         Every stopcode gets an entry, even without upcoming visits, so the status LED sees it was refreshed.
-        vehicle_stop_sequence_dict, from TransitVehiclePositionsResponse, and first_stop_sequence_dict, from
-        remember_first_stop_sequences, decide which buses are en route
+        vehicle_stop_sequence_dict, from TransitVehiclePositionsResponse, and starting_stop_sequence_dict, from
+        remember_starting_stop_sequences, decide which buses are en route
         """
         response_timestamp = datetime.fromtimestamp(self.feed_message.header.timestamp, timezone.utc)
         display_info_dict = {
@@ -114,7 +121,7 @@ class TransitTripUpdatesResponse:
             en_route = is_en_route(
                 stop_time_update_list,
                 (vehicle_stop_sequence_dict or {}).get(trip.trip_id),
-                (first_stop_sequence_dict or {}).get(trip.trip_id),
+                (starting_stop_sequence_dict or {}).get(trip.trip_id),
             )
             for stop_time_update in stop_time_update_list:
                 if (

@@ -76,10 +76,11 @@ class EnRouteFromFeedTest(unittest.TestCase):
         )
         self.assertEqual(en_route, {"48": True})
 
-    def test_a_trip_whose_first_stop_is_not_numbered_1_is_judged_by_its_times(self):
+    def test_a_trip_holding_at_its_second_stop_is_judged_by_its_times(self):
+        # some route 9 trips hold at stop 2 before setting off, and the feed lists it with only a departure time
         leaves = _NOW + timedelta(minutes=4)
         en_route = self._en_route_by_route(
-            ("9", [(2, "terminal", None, leaves), (5, _STOP, leaves + timedelta(minutes=5), None)]),
+            ("9", [(2, "hold", None, leaves), (5, _STOP, leaves + timedelta(minutes=5), None)]),
         )
         self.assertEqual(en_route, {"9": False})
 
@@ -119,9 +120,13 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         trip = [(1, "terminal", None, leaves), (6, _STOP, leaves + timedelta(minutes=6), None)]
         self.assertTrue(self._en_route(trip, {"0": 2}))
 
-    def test_a_trip_whose_first_stop_is_numbered_2(self):
+    def test_a_trip_holding_at_its_second_stop_sets_off_from_there(self):
         leaves = _NOW + timedelta(minutes=1)
-        trip = [(2, "terminal", None, leaves), (5, _STOP, leaves + timedelta(minutes=5), None)]
+        trip = [
+            (1, "terminal", None, leaves),
+            (2, "hold", None, leaves + timedelta(minutes=20)),
+            (5, _STOP, leaves + timedelta(minutes=25), None),
+        ]
         self.assertFalse(self._en_route(trip, {"0": 2}))
         self.assertTrue(self._en_route(trip, {"0": 3}))
 
@@ -131,35 +136,42 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         self.assertTrue(self._en_route(trip, {"another trip": 1}))
 
 
-class RememberedFirstStopTest(unittest.TestCase):
-    """A trip whose first stop isn't numbered 1 keeps that number once the trip updates feed drops the stop"""
+class RememberedStartingStopTest(unittest.TestCase):
+    """A route 9 trip that holds at stop 2 keeps setting off from there once the trip updates feed drops it"""
 
     _LEAVES = _NOW + timedelta(minutes=1)
-    _BEFORE = [(2, "terminal", None, _LEAVES), (5, _STOP, _LEAVES + timedelta(minutes=5), None)]
+    # refreshes: both departure-only stops listed, then stop 1 dropped, then stop 2 dropped while the bus boards
+    _FIRST = [
+        (1, "terminal", None, _LEAVES - timedelta(minutes=20)),
+        (2, "hold", None, _LEAVES),
+        (5, _STOP, _LEAVES + timedelta(minutes=5), None),
+    ]
+    _SECOND = [(2, "hold", None, _LEAVES), (5, _STOP, _LEAVES + timedelta(minutes=5), None)]
     _AFTER = [(3, "next", _LEAVES, _LEAVES), (5, _STOP, _LEAVES + timedelta(minutes=5), None)]
 
-    def _en_route_after_dropping_the_first_stop(self, vehicle_stop_sequence, seen_before):
-        first_stop_sequence_dict: dict[str, int] = {}
+    def _en_route_after_dropping_the_starting_stop(self, vehicle_stop_sequence, seen_before):
+        starting_stop_sequence_dict: dict[str, int] = {}
         if seen_before:
-            _feed(("9", self._BEFORE)).remember_first_stop_sequences(first_stop_sequence_dict)
+            for trip in (self._FIRST, self._SECOND):
+                _feed(("9", trip)).remember_starting_stop_sequences(starting_stop_sequence_dict)
         after = _feed(("9", self._AFTER))
-        after.remember_first_stop_sequences(first_stop_sequence_dict)
+        after.remember_starting_stop_sequences(starting_stop_sequence_dict)
         stop_visits = after.convert_to_display_info_dict(
-            [_STOP], {"0": vehicle_stop_sequence}, first_stop_sequence_dict
+            [_STOP], {"0": vehicle_stop_sequence}, starting_stop_sequence_dict
         )[_STOP].stop_visit_list
         return stop_visits[0].en_route
 
-    def test_a_bus_boarding_at_a_first_stop_numbered_2_is_not_en_route(self):
-        self.assertFalse(self._en_route_after_dropping_the_first_stop(2, seen_before=True))
-        self.assertTrue(self._en_route_after_dropping_the_first_stop(3, seen_before=True))
+    def test_a_bus_still_holding_at_stop_2_is_not_en_route(self):
+        self.assertFalse(self._en_route_after_dropping_the_starting_stop(2, seen_before=True))
+        self.assertTrue(self._en_route_after_dropping_the_starting_stop(3, seen_before=True))
 
-    def test_a_trip_first_seen_without_its_first_stop_takes_it_to_be_1(self):
-        self.assertTrue(self._en_route_after_dropping_the_first_stop(2, seen_before=False))
+    def test_a_trip_first_seen_without_its_starting_stop_sets_off_from_stop_1(self):
+        self.assertTrue(self._en_route_after_dropping_the_starting_stop(2, seen_before=False))
 
-    def test_trips_that_leave_the_feed_are_forgotten(self):
-        first_stop_sequence_dict = {"gone": 1}
-        _feed(("9", self._BEFORE)).remember_first_stop_sequences(first_stop_sequence_dict)
-        self.assertEqual(first_stop_sequence_dict, {"0": 2})
+    def test_the_latest_starting_stop_is_kept_and_trips_that_leave_the_feed_are_forgotten(self):
+        starting_stop_sequence_dict = {"gone": 1}
+        _feed(("9", self._FIRST)).remember_starting_stop_sequences(starting_stop_sequence_dict)
+        self.assertEqual(starting_stop_sequence_dict, {"0": 2})
 
 
 class VehiclePositionsTest(unittest.TestCase):
@@ -224,11 +236,11 @@ class ApiLoopRequestsTest(unittest.TestCase):
         vehicle_dicts = []
 
         class FakeTripUpdates:
-            def remember_first_stop_sequences(self, first_stop_sequence_dict):
+            def remember_starting_stop_sequences(self, starting_stop_sequence_dict):
                 pass
 
             def convert_to_display_info_dict(
-                self, stopcode_list, vehicle_stop_sequence_dict=None, first_stop_sequence_dict=None
+                self, stopcode_list, vehicle_stop_sequence_dict=None, starting_stop_sequence_dict=None
             ):
                 vehicle_dicts.append(vehicle_stop_sequence_dict)
                 return {}
@@ -424,6 +436,22 @@ class TowedRowTest(unittest.TestCase):
         # 12 is towed in with its marker, and 31 without one
         self.assertEqual(towed_texts, ["48 ", "12", "31", main.EN_ROUTE_MARKER])
         self.assertEqual(towed_segments[3][0], towed_segments[1][0] - 3)
+
+        # the animation's own callback dims and shifts the marker with the rest of the row
+        draw_segments = play.call_args.args[6]
+        canvas = FakeCanvas()
+        draw_segments(canvas, [towed_segments[3]], 0.5, 7)
+        marker_x_pos = towed_segments[3][0] + 7
+        dimmed_rgb = tuple(int(channel * 0.5) for channel in towed_segments[3][2])
+        self.assertEqual(
+            canvas.pixels,
+            {
+                (marker_x_pos, 3): dimmed_rgb,
+                (marker_x_pos, 4): dimmed_rgb,
+                (marker_x_pos + 1, 4): dimmed_rgb,
+                (marker_x_pos, 5): dimmed_rgb,
+            },
+        )
 
     def test_without_fresh_data_for_the_stop_the_rows_own_flags_are_used(self):
         due = _NOW
