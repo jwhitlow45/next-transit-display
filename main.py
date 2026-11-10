@@ -52,13 +52,25 @@ sunrise_sunset_result_lock = threading.Lock()
 animation_queue: AnimationQueue | None = None
 animation_context: AnimationContext | None = None
 
-# A small arrowhead drawn just left of an arrival time whose bus has left the first stop of its route. It sits inside
-# the space before the time, with a blank column between it and the digits, so no text moves to make room for it.
-# Rows carry it as a segment with this text, which draw_segment draws as pixels rather than as a glyph of the font
-EN_ROUTE_MARKER = "\u25b8"
-_EN_ROUTE_MARKER_PIXELS = ((0, 0), (0, 1), (1, 1), (0, 2))
+# A small arrowhead drawn just left of an arrival time whose bus has left the first stop of its route, pointing the way
+# its row's departure animation drives. It sits inside the space before the time, with a blank column between it and
+# the digits, so no text moves to make room for it. Rows carry it as a segment with the marker text for their
+# direction, which draw_segment draws as pixels rather than as a glyph of the font
+EN_ROUTE_MARKER_BY_DIRECTION = {
+    AnimationDirection.LEFT_TO_RIGHT: "\u25b8",
+    AnimationDirection.RIGHT_TO_LEFT: "\u25c2",
+}
 _EN_ROUTE_MARKER_WIDTH = 2
 _EN_ROUTE_MARKER_HEIGHT = 3
+_RIGHT_POINTING_MARKER_PIXELS = ((0, 0), (0, 1), (1, 1), (0, 2))
+# the left-pointing marker mirrors the right-pointing one within the same box, so flipping it moves no pixel nearer
+# the text
+_EN_ROUTE_MARKER_PIXELS = {
+    EN_ROUTE_MARKER_BY_DIRECTION[AnimationDirection.LEFT_TO_RIGHT]: _RIGHT_POINTING_MARKER_PIXELS,
+    EN_ROUTE_MARKER_BY_DIRECTION[AnimationDirection.RIGHT_TO_LEFT]: tuple(
+        (_EN_ROUTE_MARKER_WIDTH - 1 - x_offset, y_offset) for x_offset, y_offset in _RIGHT_POINTING_MARKER_PIXELS
+    ),
+}
 # Vehicle positions are fetched every other refresh, so they are normally up to 2 refreshes old. 5 still allows one
 # failed fetch, and anything older falls back to the trip updates feed's own guess
 _VEHICLE_POSITIONS_MAX_AGE_REFRESHES = 5
@@ -231,6 +243,7 @@ def get_row_draw_segments(
     display_line: str,
     row_times: list[datetime],
     row_en_route: list[bool],
+    animation_direction: AnimationDirection,
     identifier_rgb: tuple[int, int, int],
     row_y_pos: int,
     now: datetime,
@@ -239,9 +252,11 @@ def get_row_draw_segments(
 
     Rows are split into an identifier segment and one segment per arrival time so each can be colored
     independently: identifiers in their line's configured color, the leading arrival time by urgency,
-    and far-off :( times faintly. With ENABLE_EN_ROUTE_INDICATOR on, an EN_ROUTE_MARKER segment in its time's
-    color follows the time segments for each bus that has left the start of its route
+    and far-off :( times faintly. With ENABLE_EN_ROUTE_INDICATOR on, an en route marker segment in its time's
+    color, pointing the row's animation direction, follows the time segments for each bus that has left the
+    start of its route
     """
+    marker_text = EN_ROUTE_MARKER_BY_DIRECTION[animation_direction]
     baseline_rgb = getattr(Colors, env.FONT_COLOR)
     run_rgb = getattr(Colors, env.ARRIVAL_RUN_COLOR)
     leave_now_rgb = getattr(Colors, env.ARRIVAL_LEAVE_NOW_COLOR)
@@ -276,7 +291,7 @@ def get_row_draw_segments(
         row_segments.append((time_x_pos, row_y_pos, time_rgb, time_text))
         if env.ENABLE_EN_ROUTE_INDICATOR == 1 and row_en_route[time_idx]:
             marker_x_pos = time_x_pos - 1 - _EN_ROUTE_MARKER_WIDTH
-            marker_segments.append((marker_x_pos, row_y_pos, time_rgb, EN_ROUTE_MARKER))
+            marker_segments.append((marker_x_pos, row_y_pos, time_rgb, marker_text))
     return row_segments + marker_segments
 
 
@@ -284,6 +299,7 @@ def get_display_line_draw_args(
     display_lines: list[str],
     display_line_arrival_times: list[list[datetime]],
     display_line_en_route: list[list[bool]],
+    display_line_animation_directions: list[AnimationDirection],
     display_line_colors: list[tuple[int, int, int]],
     font,
     now: datetime,
@@ -295,6 +311,7 @@ def get_display_line_draw_args(
             # only the displayed subset of each row's arrival times has segments in the row text
             display_line_arrival_times[idx][: env.FUTURE_STOP_VISITS_SHOWN],
             display_line_en_route[idx][: env.FUTURE_STOP_VISITS_SHOWN],
+            display_line_animation_directions[idx],
             display_line_colors[idx],
             1 + (font.height * (idx + 1)),
             now,
@@ -304,13 +321,14 @@ def get_display_line_draw_args(
 
 
 def draw_segment(canvas, font, x_pos: int, y_pos: int, rgb: tuple[int, ...], text: str):
-    """Draws one (x, y, rgb, text) row segment: the en route marker as pixels, anything else as text"""
-    if text != EN_ROUTE_MARKER:
+    """Draws one (x, y, rgb, text) row segment: an en route marker as pixels, anything else as text"""
+    marker_pixels = _EN_ROUTE_MARKER_PIXELS.get(text)
+    if marker_pixels is None:
         graphics.DrawText(canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
         return
     # centered on the digits, which fill the font.baseline rows above the baseline at y_pos
     top_y_pos = y_pos - font.baseline + (font.baseline - _EN_ROUTE_MARKER_HEIGHT) // 2
-    for x_offset, y_offset in _EN_ROUTE_MARKER_PIXELS:
+    for x_offset, y_offset in marker_pixels:
         canvas.SetPixel(x_pos + x_offset, top_y_pos + y_offset, *rgb)
 
 
@@ -395,7 +413,7 @@ def pulse_imminent_arrivals(
             pulse_segments.extend(
                 segment
                 for segment in graphics_display_line_args[idx]
-                if segment[3] == EN_ROUTE_MARKER and segment[0] == leading_marker_x_pos
+                if segment[3] in _EN_ROUTE_MARKER_PIXELS and segment[0] == leading_marker_x_pos
             )
 
     start_time = monotonic()
@@ -497,6 +515,7 @@ def play_departure_animation_for_due_arrivals(
             towed_display_line,
             remaining_times,
             [en_route for _, en_route in remaining_arrivals],
+            display_line_animation_directions[idx],
             identifier_rgb,
             row_baseline_y_pos,
             now,
@@ -599,7 +618,13 @@ def display_loop():
                 continue
 
             graphics_display_line_args = get_display_line_draw_args(
-                display_lines, display_line_arrival_times, display_line_en_route, display_line_colors, font, now
+                display_lines,
+                display_line_arrival_times,
+                display_line_en_route,
+                display_line_animation_directions,
+                display_line_colors,
+                font,
+                now,
             )
 
             # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display

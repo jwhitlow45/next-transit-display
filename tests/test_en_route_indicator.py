@@ -14,6 +14,10 @@ from models.OpenData511 import TransitTripUpdatesResponse, TransitVehiclePositio
 _FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "5x7.bdf")
 _NOW = datetime(2026, 11, 9, 18, 0, tzinfo=timezone.utc)
 _STOP = "13516"
+_RIGHT = main.AnimationDirection.LEFT_TO_RIGHT
+_LEFT = main.AnimationDirection.RIGHT_TO_LEFT
+_RIGHT_MARKER = main.EN_ROUTE_MARKER_BY_DIRECTION[_RIGHT]
+_LEFT_MARKER = main.EN_ROUTE_MARKER_BY_DIRECTION[_LEFT]
 
 
 def _font():
@@ -297,9 +301,9 @@ class RowSegmentsTest(unittest.TestCase):
     _TIMES = [_NOW + timedelta(minutes=4, seconds=30), _NOW + timedelta(minutes=44, seconds=30)]
     _LINE = "48 04 44"
 
-    def _segments(self, en_route, indicator):
+    def _segments(self, en_route, indicator, direction=_RIGHT):
         with mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", indicator):
-            return main.get_row_draw_segments(self._LINE, self._TIMES, en_route, (150, 30, 0), 8, _NOW)
+            return main.get_row_draw_segments(self._LINE, self._TIMES, en_route, direction, (150, 30, 0), 8, _NOW)
 
     def _pixels(self, segments):
         canvas = FakeCanvas()
@@ -308,89 +312,130 @@ class RowSegmentsTest(unittest.TestCase):
         return canvas.pixels
 
     def test_no_markers_with_the_indicator_off(self):
-        segments = self._segments([True, True], 0)
-        self.assertNotIn(main.EN_ROUTE_MARKER, [text for *_, text in segments])
+        for direction in (_RIGHT, _LEFT):
+            with self.subTest(direction=direction):
+                segment_texts = [text for *_, text in self._segments([True, True], 0, direction)]
+                self.assertNotIn(_RIGHT_MARKER, segment_texts)
+                self.assertNotIn(_LEFT_MARKER, segment_texts)
 
     def test_markers_only_for_buses_en_route(self):
         segments = self._segments([False, True], 1)
-        markers = [segment for segment in segments if segment[3] == main.EN_ROUTE_MARKER]
+        markers = [segment for segment in segments if segment[3] == _RIGHT_MARKER]
         second_time_x_pos = segments[2][0]
         self.assertEqual(len(markers), 1)
         self.assertEqual(markers[0][0], second_time_x_pos - 3)
 
+    def test_a_right_to_left_rows_markers_point_left_in_the_same_place(self):
+        right_segments = self._segments([True, True], 1, _RIGHT)
+        left_segments = self._segments([True, True], 1, _LEFT)
+        self.assertEqual(
+            left_segments,
+            [(x, y, rgb, _LEFT_MARKER if text == _RIGHT_MARKER else text) for x, y, rgb, text in right_segments],
+        )
+
     def test_markers_leave_the_text_segments_unchanged(self):
-        without_markers = self._segments([True, True], 0)
-        with_markers = self._segments([True, True], 1)
-        # identifier first and leading time second, which the pulse and departure animation rely on
-        self.assertEqual(with_markers[: len(without_markers)], without_markers)
+        for direction in (_RIGHT, _LEFT):
+            with self.subTest(direction=direction):
+                without_markers = self._segments([True, True], 0, direction)
+                with_markers = self._segments([True, True], 1, direction)
+                # identifier first and leading time second, which the pulse and departure animation rely on
+                self.assertEqual(with_markers[: len(without_markers)], without_markers)
 
     def test_markers_never_touch_or_move_the_text(self):
-        text_pixels = self._pixels(self._segments([True, True], 0))
-        all_pixels = self._pixels(self._segments([True, True], 1))
-        marker_pixels = {xy: rgb for xy, rgb in all_pixels.items() if xy not in text_pixels}
-        self.assertEqual({xy: all_pixels[xy] for xy in text_pixels}, text_pixels)
-        self.assertEqual(len(marker_pixels), 8)
-        # a blank column always separates each marker pixel from every text pixel, side by side and diagonally
-        for marker_x, marker_y in marker_pixels:
-            for text_x, text_y in text_pixels:
-                self.assertFalse(abs(marker_x - text_x) <= 1 and abs(marker_y - text_y) <= 1)
+        for direction in (_RIGHT, _LEFT):
+            with self.subTest(direction=direction):
+                text_pixels = self._pixels(self._segments([True, True], 0, direction))
+                all_pixels = self._pixels(self._segments([True, True], 1, direction))
+                marker_pixels = {xy: rgb for xy, rgb in all_pixels.items() if xy not in text_pixels}
+                self.assertEqual({xy: all_pixels[xy] for xy in text_pixels}, text_pixels)
+                self.assertEqual(len(marker_pixels), 8)
+                # a blank column always separates each marker pixel from every text pixel, side by side and
+                # diagonally
+                for marker_x, marker_y in marker_pixels:
+                    for text_x, text_y in text_pixels:
+                        self.assertFalse(abs(marker_x - text_x) <= 1 and abs(marker_y - text_y) <= 1)
 
 
 class DisplayRowsTest(unittest.TestCase):
-    def test_en_route_flags_line_up_with_the_times_and_follow_the_displayed_subset(self):
-        times = [_NOW + timedelta(minutes=minutes, seconds=30) for minutes in (4, 12, 31)]
-        snapshot = {
-            _STOP: DisplayInfoModel(
-                response_timestamp=_NOW,
-                stop_visit_list=[
-                    # out of time order, which build_display_rows sorts
-                    StopVisitModel(line_reference="48", expected_arrival_time=times[1], en_route=False),
-                    StopVisitModel(line_reference="48", expected_arrival_time=times[2], en_route=True),
-                    StopVisitModel(line_reference="48", expected_arrival_time=times[0], en_route=True),
-                ],
-            )
-        }
-        rows = main.build_display_rows(snapshot, _NOW, 4)
-        self.assertEqual(rows[1], [times])
-        self.assertEqual(rows[5], [[True, False, True]])
+    _TIMES = [_NOW + timedelta(minutes=minutes, seconds=30) for minutes in (4, 12, 31)]
+    _SNAPSHOT = {
+        _STOP: DisplayInfoModel(
+            response_timestamp=_NOW,
+            stop_visit_list=[
+                # out of time order, which build_display_rows sorts
+                StopVisitModel(line_reference="48", expected_arrival_time=_TIMES[1], en_route=False),
+                StopVisitModel(line_reference="48", expected_arrival_time=_TIMES[2], en_route=True),
+                StopVisitModel(line_reference="48", expected_arrival_time=_TIMES[0], en_route=True),
+            ],
+        )
+    }
+
+    def _draw_args(self, rows):
         with mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", 1):
-            segments = main.get_display_line_draw_args(rows[0], rows[1], rows[5], rows[3], _font(), _NOW)[0]
+            return main.get_display_line_draw_args(rows[0], rows[1], rows[5], rows[2], rows[3], _font(), _NOW)
+
+    def test_en_route_flags_line_up_with_the_times_and_follow_the_displayed_subset(self):
+        rows = main.build_display_rows(self._SNAPSHOT, _NOW, 4)
+        self.assertEqual(rows[1], [self._TIMES])
+        self.assertEqual(rows[5], [[True, False, True]])
+        segments = self._draw_args(rows)[0]
         # FUTURE_STOP_VISITS_SHOWN is 2 in the test environment, so 31 and its marker aren't displayed
-        markers = [segment for segment in segments if segment[3] == main.EN_ROUTE_MARKER]
-        self.assertEqual([text for *_, text in segments], ["48 ", "O4", "12", main.EN_ROUTE_MARKER])
+        markers = [segment for segment in segments if segment[3] == _RIGHT_MARKER]
+        self.assertEqual([text for *_, text in segments], ["48 ", "O4", "12", _RIGHT_MARKER])
         self.assertEqual(markers[0][0], segments[1][0] - 3)
+
+    def test_markers_point_the_way_the_lines_animation_drives(self):
+        with mock.patch.object(main.env, "LINE_ANIMATION_DIRECTION_DICT", {_STOP: {"48": "L"}}):
+            rows = main.build_display_rows(self._SNAPSHOT, _NOW, 4)
+        self.assertEqual(rows[2], [_LEFT])
+        segments = self._draw_args(rows)[0]
+        self.assertEqual([text for *_, text in segments], ["48 ", "O4", "12", _LEFT_MARKER])
 
 
 class MarkerDrawingTest(unittest.TestCase):
     def test_a_dimmed_and_shifted_marker_draws_where_and_how_the_animation_asks(self):
         # the departure animation fades and tows rows by passing draw_segment a dimmed color and a shifted x
         canvas = FakeCanvas()
-        main.draw_segment(canvas, _font(), 20 + 7, 8, (60, 12, 0), main.EN_ROUTE_MARKER)
+        main.draw_segment(canvas, _font(), 20 + 7, 8, (60, 12, 0), _RIGHT_MARKER)
         self.assertEqual(
             canvas.pixels, {(27, 3): (60, 12, 0), (27, 4): (60, 12, 0), (28, 4): (60, 12, 0), (27, 5): (60, 12, 0)}
         )
 
+    def test_the_left_pointing_marker_mirrors_the_right_pointing_one_in_the_same_columns(self):
+        canvas = FakeCanvas()
+        main.draw_segment(canvas, _font(), 27, 8, (60, 12, 0), _LEFT_MARKER)
+        self.assertEqual(
+            canvas.pixels, {(28, 3): (60, 12, 0), (27, 4): (60, 12, 0), (28, 4): (60, 12, 0), (28, 5): (60, 12, 0)}
+        )
+
     def test_the_leading_times_marker_pulses_with_it(self):
         times = [_NOW + timedelta(seconds=3), _NOW + timedelta(minutes=12, seconds=30)]
-        with mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", 1):
-            row_segments = main.get_row_draw_segments("48 OO 12", times, [True, True], (150, 30, 0), 8, _NOW)
-        matrix = FakeMatrix()
-        with (
-            mock.patch.object(main, "datetime", wraps=datetime) as patched_datetime,
-            # half a pulse in, where the pulse is at its dimmest
-            mock.patch.object(main, "monotonic", side_effect=[0.0, 0.5 / main.env.PULSE_FREQUENCY_HZ]),
-            mock.patch.object(main, "sleep"),
-        ):
-            patched_datetime.now.side_effect = [_NOW, _NOW, times[0]]
-            main.pulse_imminent_arrivals(
-                matrix, FakeCanvas(), _font(), times[0], [times], [row_segments], (63, 31), (0, 0, 0)
-            )
-        frame = matrix.frames[0]
-        # the leading time, due now, is in the run color, and only it and its marker dim
-        _, _, leading_rgb, _ = row_segments[1]
-        dimmed_leading_rgb = tuple(int(channel * main.env.PULSE_MIN_BRIGHTNESS_PERCENT) for channel in leading_rgb)
-        self.assertEqual(frame[(row_segments[1][0] - 3, 4)], dimmed_leading_rgb)
-        self.assertEqual(frame[(row_segments[2][0] - 3, 4)], row_segments[2][2])
+        for direction in (_RIGHT, _LEFT):
+            with self.subTest(direction=direction):
+                with mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", 1):
+                    row_segments = main.get_row_draw_segments(
+                        "48 OO 12", times, [True, True], direction, (150, 30, 0), 8, _NOW
+                    )
+                matrix = FakeMatrix()
+                with (
+                    mock.patch.object(main, "datetime", wraps=datetime) as patched_datetime,
+                    # half a pulse in, where the pulse is at its dimmest
+                    mock.patch.object(main, "monotonic", side_effect=[0.0, 0.5 / main.env.PULSE_FREQUENCY_HZ]),
+                    mock.patch.object(main, "sleep"),
+                ):
+                    patched_datetime.now.side_effect = [_NOW, _NOW, times[0]]
+                    main.pulse_imminent_arrivals(
+                        matrix, FakeCanvas(), _font(), times[0], [times], [row_segments], (63, 31), (0, 0, 0)
+                    )
+                frame = matrix.frames[0]
+                # the leading time, due now, is in the run color, and only it and its marker dim. Both markers
+                # light the middle row of their left column
+                _, _, leading_rgb, _ = row_segments[1]
+                dimmed_leading_rgb = tuple(
+                    int(channel * main.env.PULSE_MIN_BRIGHTNESS_PERCENT) for channel in leading_rgb
+                )
+                self.assertEqual(frame[(row_segments[1][0] - 3, 4)], dimmed_leading_rgb)
+                self.assertEqual(frame[(row_segments[2][0] - 3, 4)], row_segments[2][2])
 
 
 class TowedRowTest(unittest.TestCase):
@@ -417,7 +462,9 @@ class TowedRowTest(unittest.TestCase):
             mock.patch.object(main, "play_departure_animation") as play,
         ):
             patched_datetime.now.return_value = _NOW + timedelta(seconds=1)
-            row_segments = main.get_row_draw_segments("48 00 12", times[:2], en_route[:2], (150, 30, 0), 8, _NOW)
+            row_segments = main.get_row_draw_segments(
+                "48 00 12", times[:2], en_route[:2], _RIGHT, (150, 30, 0), 8, _NOW
+            )
             main.play_departure_animation_for_due_arrivals(
                 None,
                 "canvas",
@@ -426,7 +473,7 @@ class TowedRowTest(unittest.TestCase):
                 [times],
                 [en_route],
                 [(_STOP, "48")],
-                [main.AnimationDirection.LEFT_TO_RIGHT],
+                [_RIGHT],
                 [row_segments],
                 (63, 31),
                 (0, 0, 0),
@@ -434,7 +481,7 @@ class TowedRowTest(unittest.TestCase):
         towed_segments = play.call_args.args[3][0].towed_segments
         towed_texts = [text for *_, text in towed_segments]
         # 12 is towed in with its marker, and 31 without one
-        self.assertEqual(towed_texts, ["48 ", "12", "31", main.EN_ROUTE_MARKER])
+        self.assertEqual(towed_texts, ["48 ", "12", "31", _RIGHT_MARKER])
         self.assertEqual(towed_segments[3][0], towed_segments[1][0] - 3)
 
         # the animation's own callback dims and shifts the marker with the rest of the row
@@ -453,7 +500,7 @@ class TowedRowTest(unittest.TestCase):
             },
         )
 
-    def test_without_fresh_data_for_the_stop_the_rows_own_flags_are_used(self):
+    def _towed_segments_without_fresh_data(self, direction):
         due = _NOW
         times = [
             due + timedelta(seconds=1),
@@ -468,7 +515,9 @@ class TowedRowTest(unittest.TestCase):
             mock.patch.object(main, "play_departure_animation") as play,
         ):
             patched_datetime.now.return_value = _NOW + timedelta(seconds=1)
-            row_segments = main.get_row_draw_segments("48 OO 12", times[:2], en_route[:2], (150, 30, 0), 8, _NOW)
+            row_segments = main.get_row_draw_segments(
+                "48 OO 12", times[:2], en_route[:2], direction, (150, 30, 0), 8, _NOW
+            )
             main.play_departure_animation_for_due_arrivals(
                 None,
                 "canvas",
@@ -477,14 +526,22 @@ class TowedRowTest(unittest.TestCase):
                 [times],
                 [en_route],
                 [(_STOP, "48")],
-                [main.AnimationDirection.LEFT_TO_RIGHT],
+                [direction],
                 [row_segments],
                 (63, 31),
                 (0, 0, 0),
             )
-        towed_segments = play.call_args.args[3][0].towed_segments
+        return play.call_args.args[3][0].towed_segments
+
+    def test_without_fresh_data_for_the_stop_the_rows_own_flags_are_used(self):
+        towed_segments = self._towed_segments_without_fresh_data(_RIGHT)
         # 12 without a marker, 31 with one
-        self.assertEqual([text for *_, text in towed_segments], ["48 ", "12", "31", main.EN_ROUTE_MARKER])
+        self.assertEqual([text for *_, text in towed_segments], ["48 ", "12", "31", _RIGHT_MARKER])
+        self.assertEqual(towed_segments[3][0], towed_segments[2][0] - 3)
+
+    def test_a_right_to_left_rows_towed_markers_point_left(self):
+        towed_segments = self._towed_segments_without_fresh_data(_LEFT)
+        self.assertEqual([text for *_, text in towed_segments], ["48 ", "12", "31", _LEFT_MARKER])
         self.assertEqual(towed_segments[3][0], towed_segments[2][0] - 3)
 
 

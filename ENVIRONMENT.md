@@ -218,7 +218,7 @@ LINE_ANIMATION_DIRECTIONS=""
 ```
 Optional comma-separated list of departure animation directions with each entry corresponding to the same position in LINE_REFERENCES and LINE_STOPCODES. `R` drives the animation left to right and `L` drives it right to left, letting the animation match each line's real direction of travel. The first sprite in DEPARTURE_ANIMATION_SPRITES always leads the convoy in its direction of travel.
 
-If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) the animation drives left to right. See ENABLE_DEPARTURE_ANIMATION for the animation itself.
+If set it must have the same number of entries as the other lists in this section. If left empty (or for lines not listed) the animation drives left to right. See ENABLE_DEPARTURE_ANIMATION for the animation itself. With ENABLE_EN_ROUTE_INDICATOR on, each line's en route markers point the same way as its animation.
 
 Example configuration where line 1 at stop A and line 2 at stop B animate left to right, and line 1 at stop B and line 2 at stop A animate right to left:
 ```
@@ -262,7 +262,7 @@ How many future stop visits should be shown per line on the display
 ```
 ENABLE_EN_ROUTE_INDICATOR="<0|1>"
 ```
-Marks each displayed arrival time whose bus has left the first stop of its route, with a small arrowhead just left of the time in the time's color. A time without the marker belongs to a bus that hasn't left yet, as far as 511's feeds show, and its time can keep growing if the bus leaves late. This matters most at stops a few minutes from the start of a route, where a time can count down while the bus hasn't moved. The marker sits in the space before the time, so no text moves to make room for it. Defaults to 0 (off).
+Marks each displayed arrival time whose bus has left the first stop of its route, with a small arrowhead just left of the time in the time's color. The arrowhead points the way the line's departure animation drives, set by LINE_ANIMATION_DIRECTIONS (right by default). A time without the marker belongs to a bus that hasn't left yet, as far as 511's feeds show, and its time can keep growing if the bus leaves late. This matters most at stops a few minutes from the start of a route, where a time can count down while the bus hasn't moved. The marker sits in the space before the time, so no text moves to make room for it. Defaults to 0 (off).
 
 Where each bus is comes from 511's vehicle positions feed, fetched every other API refresh, so turning this on adds half as many requests again. Keep `3600 / REFRESH_API_INTERVAL_SECONDS * 1.5 / <number of API keys>` under 511's limit of 60 requests per key per hour. For example, 4 keys at 30 seconds make 45. A marker can appear up to about two refreshes after the bus really leaves. For a trip with no vehicle in that feed, or when the vehicle positions requests have been failing for a few refreshes, the marker falls back to the trip updates feed, which is less reliable at the start of a route.
 
