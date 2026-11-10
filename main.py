@@ -388,7 +388,15 @@ def pulse_imminent_arrivals(
     pulse_segments = []
     for idx, row_times in enumerate(display_line_arrival_times):
         if row_times and (min(row_times) - now).total_seconds() <= env.PULSE_WINDOW_SECONDS:
-            pulse_segments.append(graphics_display_line_args[idx][1])
+            leading_time_segment = graphics_display_line_args[idx][1]
+            pulse_segments.append(leading_time_segment)
+            # its en route marker pulses with it, rather than staying bright beside the dimming digits
+            leading_marker_x_pos = leading_time_segment[0] - 1 - _EN_ROUTE_MARKER_WIDTH
+            pulse_segments.extend(
+                segment
+                for segment in graphics_display_line_args[idx]
+                if segment[3] == EN_ROUTE_MARKER and segment[0] == leading_marker_x_pos
+            )
 
     start_time = monotonic()
     while (next_arrival_time - datetime.now(timezone.utc)).total_seconds() > 0:

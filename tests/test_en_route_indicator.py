@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
-from fakes import FakeCanvas
+from fakes import FakeCanvas, FakeMatrix
 from google.transit import gtfs_realtime_pb2
 
 import main
@@ -266,6 +266,63 @@ class RowSegmentsTest(unittest.TestCase):
                 self.assertFalse(abs(marker_x - text_x) <= 1 and abs(marker_y - text_y) <= 1)
 
 
+class DisplayRowsTest(unittest.TestCase):
+    def test_en_route_flags_line_up_with_the_times_and_follow_the_displayed_subset(self):
+        times = [_NOW + timedelta(minutes=minutes, seconds=30) for minutes in (4, 12, 31)]
+        snapshot = {
+            _STOP: DisplayInfoModel(
+                response_timestamp=_NOW,
+                stop_visit_list=[
+                    # out of time order, which build_display_rows sorts
+                    StopVisitModel(line_reference="48", expected_arrival_time=times[1], en_route=False),
+                    StopVisitModel(line_reference="48", expected_arrival_time=times[2], en_route=True),
+                    StopVisitModel(line_reference="48", expected_arrival_time=times[0], en_route=True),
+                ],
+            )
+        }
+        rows = main.build_display_rows(snapshot, _NOW, 4)
+        self.assertEqual(rows[1], [times])
+        self.assertEqual(rows[5], [[True, False, True]])
+        with mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", 1):
+            segments = main.get_display_line_draw_args(rows[0], rows[1], rows[5], rows[3], _font(), _NOW)[0]
+        # FUTURE_STOP_VISITS_SHOWN is 2 in the test environment, so 31 and its marker aren't displayed
+        markers = [segment for segment in segments if segment[3] == main.EN_ROUTE_MARKER]
+        self.assertEqual([text for *_, text in segments], ["48 ", "O4", "12", main.EN_ROUTE_MARKER])
+        self.assertEqual(markers[0][0], segments[1][0] - 3)
+
+
+class MarkerDrawingTest(unittest.TestCase):
+    def test_a_dimmed_and_shifted_marker_draws_where_and_how_the_animation_asks(self):
+        # the departure animation fades and tows rows by passing draw_segment a dimmed color and a shifted x
+        canvas = FakeCanvas()
+        main.draw_segment(canvas, _font(), 20 + 7, 8, (60, 12, 0), main.EN_ROUTE_MARKER)
+        self.assertEqual(
+            canvas.pixels, {(27, 3): (60, 12, 0), (27, 4): (60, 12, 0), (28, 4): (60, 12, 0), (27, 5): (60, 12, 0)}
+        )
+
+    def test_the_leading_times_marker_pulses_with_it(self):
+        times = [_NOW + timedelta(seconds=3), _NOW + timedelta(minutes=12, seconds=30)]
+        with mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", 1):
+            row_segments = main.get_row_draw_segments("48 OO 12", times, [True, True], (150, 30, 0), 8, _NOW)
+        matrix = FakeMatrix()
+        with (
+            mock.patch.object(main, "datetime", wraps=datetime) as patched_datetime,
+            # half a pulse in, where the pulse is at its dimmest
+            mock.patch.object(main, "monotonic", side_effect=[0.0, 0.5 / main.env.PULSE_FREQUENCY_HZ]),
+            mock.patch.object(main, "sleep"),
+        ):
+            patched_datetime.now.side_effect = [_NOW, _NOW, times[0]]
+            main.pulse_imminent_arrivals(
+                matrix, FakeCanvas(), _font(), times[0], [times], [row_segments], (63, 31), (0, 0, 0)
+            )
+        frame = matrix.frames[0]
+        # the leading time, due now, is in the run color, and only it and its marker dim
+        _, _, leading_rgb, _ = row_segments[1]
+        dimmed_leading_rgb = tuple(int(channel * main.env.PULSE_MIN_BRIGHTNESS_PERCENT) for channel in leading_rgb)
+        self.assertEqual(frame[(row_segments[1][0] - 3, 4)], dimmed_leading_rgb)
+        self.assertEqual(frame[(row_segments[2][0] - 3, 4)], row_segments[2][2])
+
+
 class TowedRowTest(unittest.TestCase):
     def test_towed_times_keep_their_markers(self):
         due = _NOW
@@ -309,6 +366,40 @@ class TowedRowTest(unittest.TestCase):
         # 12 is towed in with its marker, and 31 without one
         self.assertEqual(towed_texts, ["48 ", "12", "31", main.EN_ROUTE_MARKER])
         self.assertEqual(towed_segments[3][0], towed_segments[1][0] - 3)
+
+    def test_without_fresh_data_for_the_stop_the_rows_own_flags_are_used(self):
+        due = _NOW
+        times = [
+            due + timedelta(seconds=1),
+            _NOW + timedelta(minutes=12, seconds=30),
+            _NOW + timedelta(minutes=31, seconds=30),
+        ]
+        en_route = [True, False, True]
+        with (
+            mock.patch.object(main.env, "ENABLE_EN_ROUTE_INDICATOR", 1),
+            mock.patch.object(main, "display_info_dict", {}),
+            mock.patch.object(main, "datetime", wraps=datetime) as patched_datetime,
+            mock.patch.object(main, "play_departure_animation") as play,
+        ):
+            patched_datetime.now.return_value = _NOW + timedelta(seconds=1)
+            row_segments = main.get_row_draw_segments("48 OO 12", times[:2], en_route[:2], (150, 30, 0), 8, _NOW)
+            main.play_departure_animation_for_due_arrivals(
+                None,
+                "canvas",
+                _font(),
+                due,
+                [times],
+                [en_route],
+                [(_STOP, "48")],
+                [main.AnimationDirection.LEFT_TO_RIGHT],
+                [row_segments],
+                (63, 31),
+                (0, 0, 0),
+            )
+        towed_segments = play.call_args.args[3][0].towed_segments
+        # 12 without a marker, 31 with one
+        self.assertEqual([text for *_, text in towed_segments], ["48 ", "12", "31", main.EN_ROUTE_MARKER])
+        self.assertEqual(towed_segments[3][0], towed_segments[2][0] - 3)
 
 
 if __name__ == "__main__":
