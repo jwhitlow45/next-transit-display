@@ -257,7 +257,9 @@ How many future stop visits should be shown per line on the display
 ```
 ENABLE_EN_ROUTE_INDICATOR="<0|1>"
 ```
-Marks each displayed arrival time whose bus has left the first stop of its route, with a small arrowhead just left of the time in the time's color. A time without the marker belongs to a bus still waiting at the start of its route. Its prediction comes from the schedule, and it grows if the bus leaves late. This matters most at stops a few minutes from the start of a route, where a time can count down while the bus hasn't moved. The marker sits in the space before the time, so no text moves to make room for it. Defaults to 0 (off).
+Marks each displayed arrival time whose bus has left the first stop of its route, with a small arrowhead just left of the time in the time's color. A time without the marker belongs to a bus that hasn't left yet, as far as 511's feeds show, and its time can keep growing if the bus leaves late. This matters most at stops a few minutes from the start of a route, where a time can count down while the bus hasn't moved. The marker sits in the space before the time, so no text moves to make room for it. Defaults to 0 (off).
+
+Where each bus is comes from 511's vehicle positions feed, fetched every other API refresh, so turning this on adds half as many requests again. Keep `3600 / REFRESH_API_INTERVAL_SECONDS * 1.5 / <number of API keys>` under 511's limit of 60 requests per key per hour. For example, 4 keys at 30 seconds make 45. A marker can appear up to about two refreshes after the bus really leaves. For a trip with no vehicle in that feed, or when the vehicle positions requests have been failing for a few refreshes, the marker falls back to the trip updates feed, which is less reliable at the start of a route.
 
 #### ENABLE_DEPARTURE_ANIMATION
 ```

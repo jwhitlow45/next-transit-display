@@ -1,3 +1,4 @@
+import itertools
 import math
 import os
 import threading
@@ -11,6 +12,7 @@ from httpx import HTTPStatusError
 
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
+from models.OpenData511 import TransitVehiclePositionsResponse
 from models.SunriseSunset import SunriseSunsetResult
 from modules.animation_player import MIN_GAP_SECONDS, AnimationContext, can_start, play_animation
 from modules.animation_queue import AnimationQueue
@@ -57,6 +59,9 @@ EN_ROUTE_MARKER = "\u25b8"
 _EN_ROUTE_MARKER_PIXELS = ((0, 0), (0, 1), (1, 1), (0, 2))
 _EN_ROUTE_MARKER_WIDTH = 2
 _EN_ROUTE_MARKER_HEIGHT = 3
+# Vehicle positions are fetched every other refresh, so they are normally up to 2 refreshes old. 5 still allows one
+# failed fetch, and anything older falls back to the trip updates feed's own guess
+_VEHICLE_POSITIONS_MAX_AGE_REFRESHES = 5
 
 
 def main():
@@ -636,12 +641,14 @@ def display_loop():
             os._exit(1)
 
 
-def fetch_display_info_dict(client: OpenData511Client) -> dict[str, DisplayInfoModel]:
+def fetch_display_info_dict(
+    client: OpenData511Client, vehicle_stop_sequence_dict: dict[str, int] | None = None
+) -> dict[str, DisplayInfoModel]:
     """Fetches every stop's upcoming visits from the agency's trip updates, returning an empty dict on request
     failure so the previously fetched data stays displayed"""
     try:
         trip_updates = client.get_transit_trip_updates(env.OPEN_DATA_511_AGENCY_ID)
-        return trip_updates.convert_to_display_info_dict(env.OPEN_DATA_511_STOPCODE_LIST)
+        return trip_updates.convert_to_display_info_dict(env.OPEN_DATA_511_STOPCODE_LIST, vehicle_stop_sequence_dict)
     except HTTPStatusError as err:
         # fail program on 401; an unhandled raise would only kill this thread and leave the display
         # running with stale data forever
@@ -653,6 +660,30 @@ def fetch_display_info_dict(client: OpenData511Client) -> dict[str, DisplayInfoM
         # catch all other errors as the OpenData511 API is fickle and I don't wanna play error whack-a-mole
         logger.error("Unexpected exception while trying to fetch stop data...continuing", exc_info=True)
     return {}
+
+
+def fetch_vehicle_positions(client: OpenData511Client) -> TransitVehiclePositionsResponse | None:
+    """Fetches where every vehicle of the agency is, returning None on request failure so the previously fetched
+    positions stay in use until they are too old"""
+    try:
+        return client.get_transit_vehicle_positions(env.OPEN_DATA_511_AGENCY_ID)
+    except HTTPStatusError as err:
+        # a rejected key fails the trip updates requests too, which stop the program, so this only logs
+        logger.error(f"API Request Failed for vehicle positions: {err.response.status_code} {err.response.text}")
+    except Exception:
+        logger.error("Unexpected exception while trying to fetch vehicle positions...continuing", exc_info=True)
+    return None
+
+
+def get_fresh_vehicle_stop_sequence_dict(vehicle_positions: TransitVehiclePositionsResponse | None):
+    """The stop each trip's vehicle is at or heading to, or None when there are no vehicle positions recent enough
+    to trust over the trip updates feed"""
+    if vehicle_positions is None:
+        return None
+    age_seconds = (datetime.now(timezone.utc) - vehicle_positions.response_timestamp).total_seconds()
+    if age_seconds > _VEHICLE_POSITIONS_MAX_AGE_REFRESHES * env.REFRESH_API_INTERVAL_SECONDS:
+        return None
+    return vehicle_positions.get_trip_stop_sequence_dict()
 
 
 def refresh_sunrise_sunset_result(sunrise_sunset_client: SunriseSunsetClient):
@@ -683,16 +714,30 @@ def api_loop():
     global display_info_dict
 
     client_list = [OpenData511Client(api_key) for api_key in env.OPEN_DATA_511_API_KEY_LIST]
+    # round-robin api requests across clients to spread api usage across api keys. Each request takes the next
+    # client, so vehicle positions requests spread across the keys too
+    # this could be done smarter to avoid detection of single client using multiple api keys, but since opendata511
+    # won't respond to my rate limit increase request I doubt they'll catch this
+    client_cycle = itertools.cycle(client_list)
 
-    client_idx = 0
+    vehicle_positions: TransitVehiclePositionsResponse | None = None
+    refresh_count = 0
 
     sunrise_sunset_client: SunriseSunsetClient | None = None
     if env.ENABLE_SUN_BASED_BRIGHTNESS == 1:
         sunrise_sunset_client = SunriseSunsetClient()
 
     while True:
+        # the en route indicator reads where each bus is from the vehicle positions feed. Fetching it every other
+        # refresh adds half as many requests again, rather than doubling them
+        if env.ENABLE_EN_ROUTE_INDICATOR == 1 and refresh_count % 2 == 0:
+            vehicle_positions = fetch_vehicle_positions(next(client_cycle)) or vehicle_positions
+        refresh_count += 1
+
         # one trip updates request covers every stopcode
-        display_info_dict_staged = fetch_display_info_dict(client_list[client_idx])
+        display_info_dict_staged = fetch_display_info_dict(
+            next(client_cycle), get_fresh_vehicle_stop_sequence_dict(vehicle_positions)
+        )
 
         with display_info_lock:
             # NOTE: only want to overwrite stops for data we have fetched in case one of the API requests fails
@@ -701,13 +746,6 @@ def api_loop():
 
         if sunrise_sunset_client is not None:
             refresh_sunrise_sunset_result(sunrise_sunset_client)
-
-        # round-robin api requests across clients to spread api usage across api keys
-        # this could be done smarter to avoid detection of single client using multiple api keys, but since opendata511
-        # won't respond to my rate limit increase request I doubt they'll catch this
-        client_idx += 1
-        if client_idx >= len(client_list):
-            client_idx = 0
 
         sleep(env.REFRESH_API_INTERVAL_SECONDS)
 

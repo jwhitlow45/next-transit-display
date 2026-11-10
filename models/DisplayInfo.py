@@ -15,7 +15,7 @@ class StopVisitModel(BaseModel):
     # aimed_arrival_time: datetime | None
     expected_arrival_time: datetime | None
     # aimed_departure_time: datetime | None
-    # the bus has left the first stop of its route, so its arrival time follows a moving bus rather than a schedule
+    # the bus running this trip has left the first stop of its route, as far as the 511 feeds show
     en_route: bool = False
 
 

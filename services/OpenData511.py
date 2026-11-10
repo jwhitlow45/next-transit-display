@@ -4,7 +4,7 @@ from typing import Any
 import httpx
 from httpx_retries import Retry, RetryTransport
 
-from models.OpenData511 import TransitTripUpdatesResponse
+from models.OpenData511 import TransitTripUpdatesResponse, TransitVehiclePositionsResponse
 from modules.logger import logger
 
 
@@ -63,3 +63,14 @@ class OpenData511Client:
             },
         )
         return TransitTripUpdatesResponse(response.content)
+
+    def get_transit_vehicle_positions(self, agency: str):
+        # only served as protobuf, and covers every vehicle of the agency
+        response = self._authenticated_request(
+            "get",
+            "/transit/vehiclepositions",
+            params={
+                "agency": agency,
+            },
+        )
+        return TransitVehiclePositionsResponse(response.content)
