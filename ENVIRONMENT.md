@@ -91,6 +91,11 @@ All stopcodes are checked every `REFRESH_API_INTERVAL_SECONDS` with a single tri
 60 / number of API keys provided
 ```
 
+With `ENABLE_EN_ROUTE_INDICATOR` on, every other refresh also makes a vehicle positions request, so the minimum becomes:
+```
+90 / number of API keys provided
+```
+
 It is recommended to set `REFRESH_API_INTERVAL_SECONDS` slightly higher than the calculated value to avoid running into the rate-limit.
 
 The trip updates response covers every trip of the agency and is not compressed: for Muni it is about 850 KB per request, roughly 1.2 GB per day at a 62 second refresh interval.
