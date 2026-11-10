@@ -650,13 +650,22 @@ def display_loop():
 
 
 def fetch_display_info_dict(
-    client: OpenData511Client, vehicle_stop_sequence_dict: dict[str, int] | None = None
+    client: OpenData511Client,
+    vehicle_stop_sequence_dict: dict[str, int] | None = None,
+    first_stop_sequence_dict: dict[str, int] | None = None,
 ) -> dict[str, DisplayInfoModel]:
     """Fetches every stop's upcoming visits from the agency's trip updates, returning an empty dict on request
-    failure so the previously fetched data stays displayed"""
+    failure so the previously fetched data stays displayed
+
+    first_stop_sequence_dict carries each trip's first stop from one refresh to the next, and is updated in place
+    """
     try:
         trip_updates = client.get_transit_trip_updates(env.OPEN_DATA_511_AGENCY_ID)
-        return trip_updates.convert_to_display_info_dict(env.OPEN_DATA_511_STOPCODE_LIST, vehicle_stop_sequence_dict)
+        if first_stop_sequence_dict is not None:
+            trip_updates.remember_first_stop_sequences(first_stop_sequence_dict)
+        return trip_updates.convert_to_display_info_dict(
+            env.OPEN_DATA_511_STOPCODE_LIST, vehicle_stop_sequence_dict, first_stop_sequence_dict
+        )
     except HTTPStatusError as err:
         # fail program on 401; an unhandled raise would only kill this thread and leave the display
         # running with stale data forever
@@ -729,6 +738,7 @@ def api_loop():
     client_cycle = itertools.cycle(client_list)
 
     vehicle_positions: TransitVehiclePositionsResponse | None = None
+    first_stop_sequence_dict: dict[str, int] = {}
     refresh_count = 0
 
     sunrise_sunset_client: SunriseSunsetClient | None = None
@@ -744,7 +754,7 @@ def api_loop():
 
         # one trip updates request covers every stopcode
         display_info_dict_staged = fetch_display_info_dict(
-            next(client_cycle), get_fresh_vehicle_stop_sequence_dict(vehicle_positions)
+            next(client_cycle), get_fresh_vehicle_stop_sequence_dict(vehicle_positions), first_stop_sequence_dict
         )
 
         with display_info_lock:

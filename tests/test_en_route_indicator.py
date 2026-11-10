@@ -131,6 +131,37 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         self.assertTrue(self._en_route(trip, {"another trip": 1}))
 
 
+class RememberedFirstStopTest(unittest.TestCase):
+    """A trip whose first stop isn't numbered 1 keeps that number once the trip updates feed drops the stop"""
+
+    _LEAVES = _NOW + timedelta(minutes=1)
+    _BEFORE = [(2, "terminal", None, _LEAVES), (5, _STOP, _LEAVES + timedelta(minutes=5), None)]
+    _AFTER = [(3, "next", _LEAVES, _LEAVES), (5, _STOP, _LEAVES + timedelta(minutes=5), None)]
+
+    def _en_route_after_dropping_the_first_stop(self, vehicle_stop_sequence, seen_before):
+        first_stop_sequence_dict: dict[str, int] = {}
+        if seen_before:
+            _feed(("9", self._BEFORE)).remember_first_stop_sequences(first_stop_sequence_dict)
+        after = _feed(("9", self._AFTER))
+        after.remember_first_stop_sequences(first_stop_sequence_dict)
+        stop_visits = after.convert_to_display_info_dict(
+            [_STOP], {"0": vehicle_stop_sequence}, first_stop_sequence_dict
+        )[_STOP].stop_visit_list
+        return stop_visits[0].en_route
+
+    def test_a_bus_boarding_at_a_first_stop_numbered_2_is_not_en_route(self):
+        self.assertFalse(self._en_route_after_dropping_the_first_stop(2, seen_before=True))
+        self.assertTrue(self._en_route_after_dropping_the_first_stop(3, seen_before=True))
+
+    def test_a_trip_first_seen_without_its_first_stop_takes_it_to_be_1(self):
+        self.assertTrue(self._en_route_after_dropping_the_first_stop(2, seen_before=False))
+
+    def test_trips_that_leave_the_feed_are_forgotten(self):
+        first_stop_sequence_dict = {"gone": 1}
+        _feed(("9", self._BEFORE)).remember_first_stop_sequences(first_stop_sequence_dict)
+        self.assertEqual(first_stop_sequence_dict, {"0": 2})
+
+
 class VehiclePositionsTest(unittest.TestCase):
     def test_only_vehicles_with_a_trip_and_a_stop_count(self):
         feed = gtfs_realtime_pb2.FeedMessage()
@@ -171,7 +202,12 @@ class ApiLoopRequestsTest(unittest.TestCase):
         vehicle_dicts = []
 
         class FakeTripUpdates:
-            def convert_to_display_info_dict(self, stopcode_list, vehicle_stop_sequence_dict=None):
+            def remember_first_stop_sequences(self, first_stop_sequence_dict):
+                pass
+
+            def convert_to_display_info_dict(
+                self, stopcode_list, vehicle_stop_sequence_dict=None, first_stop_sequence_dict=None
+            ):
                 vehicle_dicts.append(vehicle_stop_sequence_dict)
                 return {}
 
