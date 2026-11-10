@@ -103,6 +103,9 @@ _DEPARTURE_ANIMATION_SPRITES = os.getenv("DEPARTURE_ANIMATION_SPRITES") or "BUS,
 # stripped so a space after a comma doesn't fail validation and leave the display dark
 DEPARTURE_ANIMATION_SPRITE_LIST = [sprite_name.strip() for sprite_name in _DEPARTURE_ANIMATION_SPRITES.split(",")]
 
+# marks each displayed arrival time whose bus has left the first stop of its route, off unless enabled
+ENABLE_EN_ROUTE_INDICATOR = int(os.getenv("ENABLE_EN_ROUTE_INDICATOR") or 0)
+
 # optional listener that plays animations published over MQTT, off unless enabled
 ENABLE_ANIMATION_LISTENER = int(os.getenv("ENABLE_ANIMATION_LISTENER") or 0)
 ANIMATION_MQTT_HOST = os.getenv("ANIMATION_MQTT_HOST") or ""

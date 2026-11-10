@@ -50,6 +50,14 @@ sunrise_sunset_result_lock = threading.Lock()
 animation_queue: AnimationQueue | None = None
 animation_context: AnimationContext | None = None
 
+# A small arrowhead drawn just left of an arrival time whose bus has left the first stop of its route. It sits inside
+# the space before the time, with a blank column between it and the digits, so no text moves to make room for it.
+# Rows carry it as a segment with this text, which draw_segment draws as pixels rather than as a glyph of the font
+EN_ROUTE_MARKER = "\u25b8"
+_EN_ROUTE_MARKER_PIXELS = ((0, 0), (0, 1), (1, 1), (0, 2))
+_EN_ROUTE_MARKER_WIDTH = 2
+_EN_ROUTE_MARKER_HEIGHT = 3
+
 
 def main():
     global animation_queue, animation_context
@@ -159,13 +167,16 @@ def group_stop_visits_by_line(stopcode: str, stop_visit_list: list[StopVisitMode
 
 
 def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: datetime, max_row_count: int):
-    """Builds the text, upcoming arrival times, animation direction, and identifier color of each display row
+    """Builds the text, upcoming arrival times, animation direction, identifier color, and whether each upcoming
+    bus is en route, of each display row
 
     Each row's arrival times list holds all upcoming arrivals, not just the FUTURE_STOP_VISITS_SHOWN
-    displayed in the row text, so the departure animation can tow in backfill times as arrivals depart
+    displayed in the row text, so the departure animation can tow in backfill times as arrivals depart.
+    Each row's en route list lines up with its arrival times
     """
     display_lines: list[str] = []
     display_line_arrival_times: list[list[datetime]] = []
+    display_line_en_route: list[list[bool]] = []
     display_line_animation_directions: list[AnimationDirection] = []
     display_line_colors: list[tuple[int, int, int]] = []
     display_line_keys: list[tuple[str, str]] = []
@@ -176,6 +187,9 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
             line_arrival_times = [
                 sv.expected_arrival_time for sv in stop_visit_list if sv.expected_arrival_time is not None
             ]
+            display_line_en_route.append(
+                [sv.en_route for sv in stop_visit_list if sv.expected_arrival_time is not None]
+            )
             display_lines.append(
                 generate_display_line_row(
                     line_reference,
@@ -204,21 +218,24 @@ def build_display_rows(display_info_snapshot: dict[str, DisplayInfoModel], now: 
         display_line_animation_directions[:max_row_count],
         display_line_colors[:max_row_count],
         display_line_keys[:max_row_count],
+        display_line_en_route[:max_row_count],
     )
 
 
 def get_row_draw_segments(
     display_line: str,
     row_times: list[datetime],
+    row_en_route: list[bool],
     identifier_rgb: tuple[int, int, int],
     row_y_pos: int,
     now: datetime,
 ):
-    """Calculates the positioned (x, y, rgb, text) DrawText segments of a single display row
+    """Calculates the positioned (x, y, rgb, text) segments of a single display row
 
     Rows are split into an identifier segment and one segment per arrival time so each can be colored
     independently: identifiers in their line's configured color, the leading arrival time by urgency,
-    and far-off :( times faintly
+    and far-off :( times faintly. With ENABLE_EN_ROUTE_INDICATOR on, an EN_ROUTE_MARKER segment in its time's
+    color follows the time segments for each bus that has left the start of its route
     """
     baseline_rgb = getattr(Colors, env.FONT_COLOR)
     run_rgb = getattr(Colors, env.ARRIVAL_RUN_COLOR)
@@ -236,6 +253,8 @@ def get_row_draw_segments(
             display_line[:times_char_index],
         )
     ]
+    # after every time segment, so the identifier stays first and the leading time second
+    marker_segments: list[tuple[int, int, tuple[int, int, int], str]] = []
     for time_idx, arrival_time in enumerate(row_times):
         time_char_index = times_char_index + 3 * time_idx
         time_text = display_line[time_char_index : time_char_index + 2]
@@ -248,23 +267,29 @@ def get_row_draw_segments(
             time_rgb = leave_now_rgb  # arriving soon, leave now
         else:
             time_rgb = baseline_rgb
-        row_segments.append((row_x_pos + time_char_index * env.FONT_WIDTH, row_y_pos, time_rgb, time_text))
-    return row_segments
+        time_x_pos = row_x_pos + time_char_index * env.FONT_WIDTH
+        row_segments.append((time_x_pos, row_y_pos, time_rgb, time_text))
+        if env.ENABLE_EN_ROUTE_INDICATOR == 1 and row_en_route[time_idx]:
+            marker_x_pos = time_x_pos - 1 - _EN_ROUTE_MARKER_WIDTH
+            marker_segments.append((marker_x_pos, row_y_pos, time_rgb, EN_ROUTE_MARKER))
+    return row_segments + marker_segments
 
 
 def get_display_line_draw_args(
     display_lines: list[str],
     display_line_arrival_times: list[list[datetime]],
+    display_line_en_route: list[list[bool]],
     display_line_colors: list[tuple[int, int, int]],
     font,
     now: datetime,
 ):
-    """Calculates the positioned (x, y, rgb, text) DrawText segments of each display row"""
+    """Calculates the positioned (x, y, rgb, text) segments of each display row"""
     return [
         get_row_draw_segments(
             display_line,
             # only the displayed subset of each row's arrival times has segments in the row text
             display_line_arrival_times[idx][: env.FUTURE_STOP_VISITS_SHOWN],
+            display_line_en_route[idx][: env.FUTURE_STOP_VISITS_SHOWN],
             display_line_colors[idx],
             1 + (font.height * (idx + 1)),
             now,
@@ -273,13 +298,24 @@ def get_display_line_draw_args(
     ]
 
 
+def draw_segment(canvas, font, x_pos: int, y_pos: int, rgb: tuple[int, ...], text: str):
+    """Draws one (x, y, rgb, text) row segment: the en route marker as pixels, anything else as text"""
+    if text != EN_ROUTE_MARKER:
+        graphics.DrawText(canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
+        return
+    # centered on the digits, which fill the font.baseline rows above the baseline at y_pos
+    top_y_pos = y_pos - font.baseline + (font.baseline - _EN_ROUTE_MARKER_HEIGHT) // 2
+    for x_offset, y_offset in _EN_ROUTE_MARKER_PIXELS:
+        canvas.SetPixel(x_pos + x_offset, top_y_pos + y_offset, *rgb)
+
+
 def draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors):
     """Draws the display row segments and status LED onto the canvas"""
     # do all drawing as close as possible to canvas clear to prevent flickering
     canvas.Clear()
     for row_segments in graphics_display_line_args:
         for x_pos, y_pos, rgb, text in row_segments:
-            graphics.DrawText(canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
+            draw_segment(canvas, font, x_pos, y_pos, rgb, text)
     canvas.SetPixel(*status_led_xy, *status_led_colors)
 
 
@@ -360,8 +396,8 @@ def pulse_imminent_arrivals(
         # re-draw the normal frame and overdraw each pulsing arrival time in a dimmed copy of its own color
         draw_display_frame(canvas, font, graphics_display_line_args, status_led_xy, status_led_colors)
         for x_pos, y_pos, rgb, text in pulse_segments:
-            pulse_color = graphics.Color(*(int(channel * brightness_percent) for channel in rgb))
-            graphics.DrawText(canvas, font, x_pos, y_pos, pulse_color, text)
+            pulse_rgb = tuple(int(channel * brightness_percent) for channel in rgb)
+            draw_segment(canvas, font, x_pos, y_pos, pulse_rgb, text)
         canvas = matrix.SwapOnVSync(canvas)
 
         sleep(1 / env.PULSE_FRAMES_PER_SECOND)
@@ -374,6 +410,7 @@ def play_departure_animation_for_due_arrivals(
     font,
     next_arrival_time: datetime | None,
     display_line_arrival_times: list[list[datetime]],
+    display_line_en_route: list[list[bool]],
     display_line_keys: list[tuple[str, str]],
     display_line_animation_directions: list[AnimationDirection],
     graphics_display_line_args,
@@ -402,14 +439,14 @@ def play_departure_animation_for_due_arrivals(
     def draw_animation_background(animation_canvas):
         for row_segments in background_display_line_args:
             for x_pos, y_pos, rgb, text in row_segments:
-                graphics.DrawText(animation_canvas, font, x_pos, y_pos, graphics.Color(*rgb), text)
+                draw_segment(animation_canvas, font, x_pos, y_pos, rgb, text)
         animation_canvas.SetPixel(*status_led_xy, *status_led_colors)
 
     # animated rows draw their segments at a brightness and x offset so they can fade out and be towed in
     def draw_animation_segments(animation_canvas, segments, brightness_percent, x_offset):
         for x_pos, y_pos, rgb, text in segments:
-            dimmed_color = graphics.Color(*(int(channel * brightness_percent) for channel in rgb))
-            graphics.DrawText(animation_canvas, font, x_pos + x_offset, y_pos, dimmed_color, text)
+            dimmed_rgb = tuple(int(channel * brightness_percent) for channel in rgb)
+            draw_segment(animation_canvas, font, x_pos + x_offset, y_pos, dimmed_rgb, text)
 
     # tow in times from the freshest fetched data so any predictions fetched since the last display
     # render are included, since the API only ever publishes a few predictions per line
@@ -424,19 +461,21 @@ def play_departure_animation_for_due_arrivals(
         # rebuild the row as it will look once the departed arrivals are removed so the convoy can tow
         # it into place, backfilling from upcoming arrivals beyond those displayed when available
         stopcode, line_reference = display_line_keys[idx]
-        upcoming_times = display_line_arrival_times[idx]
+        # (arrival time, en route) pairs
+        upcoming_arrivals = list(zip(display_line_arrival_times[idx], display_line_en_route[idx]))
         if display_info_snapshot is not None and stopcode in display_info_snapshot:
             fresh_stop_visits = group_stop_visits_by_line(
                 stopcode, display_info_snapshot[stopcode].stop_visit_list, now
             ).get(line_reference, [])
-            upcoming_times = [
-                stop_visit.expected_arrival_time
+            upcoming_arrivals = [
+                (stop_visit.expected_arrival_time, stop_visit.en_route)
                 for stop_visit in fresh_stop_visits
                 if stop_visit.expected_arrival_time is not None
             ]
-        remaining_times = [
-            arrival_time for arrival_time in upcoming_times if arrival_time > animation_end_time
-        ][: env.FUTURE_STOP_VISITS_SHOWN]
+        remaining_arrivals = [arrival for arrival in upcoming_arrivals if arrival[0] > animation_end_time][
+            : env.FUTURE_STOP_VISITS_SHOWN
+        ]
+        remaining_times = [arrival_time for arrival_time, _ in remaining_arrivals]
         # the identifier segment already holds the formatted reference and symbol, ending with the
         # separator space when times followed it; re-generating with it re-formats the times fresh
         identifier_reference = identifier_text[:-1] if identifier_text.endswith(" ") else identifier_text
@@ -444,6 +483,7 @@ def play_departure_animation_for_due_arrivals(
         towed_segments = get_row_draw_segments(
             towed_display_line,
             remaining_times,
+            [en_route for _, en_route in remaining_arrivals],
             identifier_rgb,
             row_baseline_y_pos,
             now,
@@ -525,6 +565,7 @@ def display_loop():
                 display_line_animation_directions,
                 display_line_colors,
                 display_line_keys,
+                display_line_en_route,
             ) = build_display_rows(display_info_snapshot, now, max_display_line_count)
 
             # soonest arrival time shown on the display, used to time the departure animation; when the
@@ -545,7 +586,7 @@ def display_loop():
                 continue
 
             graphics_display_line_args = get_display_line_draw_args(
-                display_lines, display_line_arrival_times, display_line_colors, font, now
+                display_lines, display_line_arrival_times, display_line_en_route, display_line_colors, font, now
             )
 
             # LED in bottom right corner of display that acts as a visual indicator for how up-to-date the display
@@ -583,6 +624,7 @@ def display_loop():
                 font,
                 next_arrival_time,
                 display_line_arrival_times,
+                display_line_en_route,
                 display_line_keys,
                 display_line_animation_directions,
                 graphics_display_line_args,

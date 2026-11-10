@@ -253,6 +253,12 @@ FUTURE_STOP_VISITS_SHOWN="2"
 ```
 How many future stop visits should be shown per line on the display
 
+#### ENABLE_EN_ROUTE_INDICATOR
+```
+ENABLE_EN_ROUTE_INDICATOR="<0|1>"
+```
+Marks each displayed arrival time whose bus has left the first stop of its route, with a small arrowhead just left of the time in the time's color. A time without the marker belongs to a bus still waiting at the start of its route. Its prediction comes from the schedule, and it grows if the bus leaves late. This matters most at stops a few minutes from the start of a route, where a time can count down while the bus hasn't moved. The marker sits in the space before the time, so no text moves to make room for it. Defaults to 0 (off).
+
 #### ENABLE_DEPARTURE_ANIMATION
 ```
 ENABLE_DEPARTURE_ANIMATION="<0|1>"
