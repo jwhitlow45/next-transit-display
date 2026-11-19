@@ -110,31 +110,31 @@ class OnConnectTest(unittest.TestCase):
         self.assertEqual(calls.mock_calls[1][0], "client.subscribe")
 
     def test_a_refill_missed_while_offline_ends_the_swap_on_reconnect(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         listener, _ = _listener(submit_departure_convoy=convoy.submit)
         listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
         listener._on_message(None, None, _Message(_ROCKY, DEPARTURE_CONVOY_TOPIC))
         # the clear was published while the display was offline, deleting the retained swap, so the reconnect
         # brings no message at all
         listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
-        self.assertEqual(convoy.sprite_names(), ("BUS",))
+        self.assertEqual(convoy.swapped_sprite_names(), None)
 
     def test_a_swap_still_retained_is_restored_on_reconnect(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         listener, _ = _listener(submit_departure_convoy=convoy.submit)
         listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
         listener._on_message(None, None, _Message(_ROCKY, DEPARTURE_CONVOY_TOPIC))
         listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
         listener._on_message(None, None, _Message(_ROCKY, DEPARTURE_CONVOY_TOPIC))
-        self.assertEqual(convoy.sprite_names(), ("ROCKY_ANGRY",))
+        self.assertEqual(convoy.swapped_sprite_names(), ("ROCKY_ANGRY",))
 
     def test_a_refused_connect_keeps_the_departure_convoy(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         convoy.submit(_ROCKY)
         listener, _ = _listener(submit_departure_convoy=convoy.submit)
         with self.assertLogs("modules.animation_mqtt", "ERROR"):
             listener._on_connect(mock.Mock(), None, None, _ReasonCode(True), None)
-        self.assertEqual(convoy.sprite_names(), ("ROCKY_ANGRY",))
+        self.assertEqual(convoy.swapped_sprite_names(), ("ROCKY_ANGRY",))
 
     def test_a_refused_connect_is_logged_without_subscribing(self):
         listener, _ = _listener()

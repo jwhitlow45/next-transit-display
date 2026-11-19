@@ -113,7 +113,7 @@ def start_animation_listener():
     context = AnimationContext(font_5x7, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
 
     queue = AnimationQueue()
-    convoy = DepartureConvoy(tuple(env.DEPARTURE_ANIMATION_SPRITE_LIST))
+    convoy = DepartureConvoy()
     AnimationListener(
         env.ANIMATION_MQTT_HOST,
         env.ANIMATION_MQTT_PORT,
@@ -127,7 +127,7 @@ def start_animation_listener():
 
 def departure_sprite_names():
     """The convoy for the next departure or loading pass, or None for the configured one"""
-    return departure_convoy.sprite_names() if departure_convoy is not None else None
+    return departure_convoy.swapped_sprite_names() if departure_convoy is not None else None
 
 
 def play_startable_animation(matrix, canvas, animation_context, next_arrival_time: datetime | None, last_animation_end: float | None):

@@ -38,19 +38,18 @@ class DepartureConvoyRequest(BaseModel):
 
 
 class DepartureConvoy:
-    """The sprites departure animations drive: the configured default, or the last valid convoy swapped in
+    """The last valid convoy a publisher swapped in, or None, when departures drive the configured one
 
-    submit runs on paho's network thread and sprite_names on the display thread. The swap replaces one tuple
-    reference, which Python does atomically, so neither side needs a lock.
+    submit runs on paho's network thread and swapped_sprite_names on the display thread. The swap replaces one
+    tuple reference, which Python does atomically, so neither side needs a lock.
     """
 
-    def __init__(self, default_sprite_names: tuple[str, ...], clock=monotonic):
-        self._default_sprite_names = default_sprite_names
+    def __init__(self, clock=monotonic):
         self._swapped_sprite_names: tuple[str, ...] | None = None
         self._rejection_log = RateLimitedLog(logger, logging.WARNING, clock=clock)
 
-    def sprite_names(self) -> tuple[str, ...]:
-        return self._swapped_sprite_names or self._default_sprite_names
+    def swapped_sprite_names(self) -> tuple[str, ...] | None:
+        return self._swapped_sprite_names
 
     def submit(self, payload: bytes):
         # an empty payload is how MQTT clears a retained message, so it also clears the swap

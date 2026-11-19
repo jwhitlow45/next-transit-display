@@ -10,26 +10,26 @@ _ROCKY = b'{"v": 1, "sprites": ["WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACT
 
 
 class DepartureConvoyTest(unittest.TestCase):
-    def test_starts_with_the_configured_convoy(self):
-        self.assertEqual(DepartureConvoy(("BUS", "STREETCAR")).sprite_names(), ("BUS", "STREETCAR"))
+    def test_starts_with_nothing_swapped(self):
+        self.assertEqual(DepartureConvoy().swapped_sprite_names(), None)
 
     def test_a_published_convoy_swaps_in_and_an_empty_payload_clears_it(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         with self.assertLogs("modules.departure_convoy", "INFO"):
             convoy.submit(_ROCKY)
-        self.assertEqual(convoy.sprite_names(), ("WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"))
+        self.assertEqual(convoy.swapped_sprite_names(), ("WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"))
         # an empty retained message is how MQTT deletes one, and the broker forwards it to subscribers
         with self.assertLogs("modules.departure_convoy", "INFO"):
             convoy.submit(b"")
-        self.assertEqual(convoy.sprite_names(), ("BUS",))
+        self.assertEqual(convoy.swapped_sprite_names(), None)
 
     def test_clearing_with_nothing_swapped_logs_nothing(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         with self.assertNoLogs("modules.departure_convoy", "INFO"):
             convoy.submit(b"")
 
     def test_resending_the_same_convoy_logs_once(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         with self.assertLogs("modules.departure_convoy", "INFO") as logs:
             convoy.submit(_ROCKY)
             convoy.submit(_ROCKY)
@@ -47,15 +47,15 @@ class DepartureConvoyTest(unittest.TestCase):
         }
         for reason, payload in bad_payloads.items():
             with self.subTest(reason):
-                convoy = DepartureConvoy(("BUS",))
+                convoy = DepartureConvoy()
                 convoy.submit(_ROCKY)
                 with self.assertLogs("modules.departure_convoy", "WARNING"):
                     convoy.submit(payload)
-                self.assertEqual(convoy.sprite_names(), ("WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"))
+                self.assertEqual(convoy.swapped_sprite_names(), ("WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"))
 
     def test_rejections_are_logged_at_most_once_a_minute(self):
         clock = mock.Mock(return_value=0.0)
-        convoy = DepartureConvoy(("BUS",), clock=clock)
+        convoy = DepartureConvoy(clock=clock)
         with self.assertLogs("modules.departure_convoy", "WARNING") as logs:
             for _ in range(5):
                 convoy.submit(b"not json")

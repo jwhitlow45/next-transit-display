@@ -117,7 +117,7 @@ class DepartureSpriteNamesTest(unittest.TestCase):
             self.assertIsNone(main.departure_sprite_names())
 
     def test_the_swapped_convoy_while_the_listener_runs(self):
-        convoy = DepartureConvoy(("BUS",))
+        convoy = DepartureConvoy()
         convoy.submit(b'{"v": 1, "sprites": ["WATER_DROP", "ROCKY_ANGRY"]}')
         with mock.patch.object(main, "departure_convoy", convoy):
             self.assertEqual(main.departure_sprite_names(), ("WATER_DROP", "ROCKY_ANGRY"))
