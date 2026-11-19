@@ -213,6 +213,74 @@ _AUTUMN_LEAF_SPRITE = [
     ".......",
 ]
 
+# rocky out of water: the last drop of water in the house, fleeing ahead of Rocky with a worried face. Bottom row left
+# transparent, so it hops along above the road
+_WATER_DROP_SPRITE = [
+    "..T..",
+    ".TTT.",
+    "TTTTT",
+    "T.T.T",
+    "TT.TT",
+    ".TTT.",
+    ".....",
+]
+
+# rocky out of water: Rocky, the house's robot vacuum, angry. He is black, and black is an unlit LED, so his body is
+# dark gray under a lighter rim, with a silver lidar turret and front bumper. Red eyes in a scowl, a red anger mark
+# above his rim, and a dry brown mop pad. His wheels are the bottom row, so he drives on the road
+_ROCKY_ANGRY_SPRITE = [
+    "...........R.",
+    ".....SSSS.R.R",
+    ".KKKKKKKKKKK.",
+    "DDDDRDDDDDDRS",
+    "DDDDDRRDDRRDS",
+    "DDDDDDDDDDDDS",
+    ".KK.HHHHH.KK.",
+]
+
+# rocky out of water: a rough-edged tumbleweed rolling behind him, since the floor is a desert now
+_TUMBLEWEED_SPRITE = [
+    "H...A..",
+    ".AHHAH.",
+    "AH.A.HA",
+    ".HA.AH.",
+    "HA.H.AH",
+    ".HAHHA.",
+    "..H..A.",
+]
+
+# rocky out of water: a cactus bringing up the rear of the desert
+_CACTUS_SPRITE = [
+    "..G..",
+    "G.G..",
+    "G.G.G",
+    "GGG.G",
+    "..GGG",
+    "..G..",
+    "..G..",
+]
+
+# rocky refilled: Rocky happy, with cyan eyes closed into a smile and a wet blue mop pad
+_ROCKY_HAPPY_SPRITE = [
+    ".....SSSS....",
+    ".KKKKKKKKKKK.",
+    "DDDDDTDDDDTDS",
+    "DDDDTDTDDTDTS",
+    "DDDDDDDDDDDDS",
+    ".KK.BBBBB.KK.",
+]
+
+# rocky refilled: the water drop, smiling now that it is home, hopping along behind him
+_WATER_DROP_HAPPY_SPRITE = [
+    "..T..",
+    ".TTT.",
+    "TTTTT",
+    "T.T.T",
+    "T...T",
+    ".TTT.",
+    ".....",
+]
+
 # these keys are the names DEPARTURE_ANIMATION_SPRITES and the convoy animation accept, keep ENVIRONMENT.md's
 # list of valid sprite names in sync
 SPRITES_BY_NAME = {
@@ -231,6 +299,12 @@ SPRITES_BY_NAME = {
     "MAYFLOWER": _MAYFLOWER_SPRITE,
     "PUMPKIN_PIE": _PUMPKIN_PIE_SPRITE,
     "AUTUMN_LEAF": _AUTUMN_LEAF_SPRITE,
+    "WATER_DROP": _WATER_DROP_SPRITE,
+    "ROCKY_ANGRY": _ROCKY_ANGRY_SPRITE,
+    "TUMBLEWEED": _TUMBLEWEED_SPRITE,
+    "CACTUS": _CACTUS_SPRITE,
+    "ROCKY_HAPPY": _ROCKY_HAPPY_SPRITE,
+    "WATER_DROP_HAPPY": _WATER_DROP_HAPPY_SPRITE,
 }
 
 

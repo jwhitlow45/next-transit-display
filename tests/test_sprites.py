@@ -32,6 +32,12 @@ class SpriteNamesTest(unittest.TestCase):
                 "MAYFLOWER",
                 "PUMPKIN_PIE",
                 "AUTUMN_LEAF",
+                "WATER_DROP",
+                "ROCKY_ANGRY",
+                "TUMBLEWEED",
+                "CACTUS",
+                "ROCKY_HAPPY",
+                "WATER_DROP_HAPPY",
             ],
         )
 
@@ -105,6 +111,20 @@ class DrawConvoyTest(unittest.TestCase):
         draw_convoy(canvas, build_convoy(("PUMPKIN_PIE",), AnimationDirection.LEFT_TO_RIGHT), 0, road_y_pos=20)
         # the pie slice is five rows, so it sits on the road two rows lower than a full-height sprite's top
         self.assertEqual((min(y for _, y in canvas.pixels), max(y for _, y in canvas.pixels)), (15, 19))
+
+    def test_rocky_drives_on_the_road_and_the_water_drop_hops(self):
+        for sprite_name in ("ROCKY_ANGRY", "ROCKY_HAPPY"):
+            with self.subTest(sprite_name):
+                canvas = FakeCanvas()
+                draw_convoy(canvas, build_convoy((sprite_name,), AnimationDirection.LEFT_TO_RIGHT), 0, road_y_pos=20)
+                # his wheels are his bottom row, one pixel above the road line
+                self.assertEqual(max(y for _, y in canvas.pixels), 19)
+        for sprite_name in ("WATER_DROP", "WATER_DROP_HAPPY"):
+            with self.subTest(sprite_name):
+                canvas = FakeCanvas()
+                draw_convoy(canvas, build_convoy((sprite_name,), AnimationDirection.LEFT_TO_RIGHT), 0, road_y_pos=20)
+                # the drop's bottom row is empty, so it hops one pixel above the wheels' row
+                self.assertEqual(max(y for _, y in canvas.pixels), 18)
 
 
 if __name__ == "__main__":

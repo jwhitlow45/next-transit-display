@@ -281,6 +281,7 @@ Optional comma-separated list of the sprites making up the departure animation's
 Valid sprite names:
 ```
 BUS STREETCAR SUBWAY_CAR GHOST_BUS PUMPKIN_COACH HEARSE BAT CHICKEN_JOCKEY PIG COW CREEPER TURKEY MAYFLOWER PUMPKIN_PIE AUTUMN_LEAF
+WATER_DROP ROCKY_ANGRY TUMBLEWEED CACTUS ROCKY_HAPPY WATER_DROP_HAPPY
 ```
 Names are case sensitive. Spaces around them are ignored. An unknown name stops the display at startup with an error listing the valid names.
 
@@ -289,6 +290,8 @@ Names are case sensitive. Spaces around them are ignored. An unknown name stops 
 `CHICKEN_JOCKEY`, `PIG`, `COW`, and `CREEPER` are Minecraft themed. The creeper faces you, since its face is what makes it a creeper.
 
 `TURKEY`, `MAYFLOWER`, `PUMPKIN_PIE`, and `AUTUMN_LEAF` are Thanksgiving themed. The turkey and the Mayflower fill the row, the pie slice is shorter and slides along the road with its point leading, and the leaf blows along above the road like the bat. Like the other animals and vehicles they face their direction of travel, so on a right-to-left line they are mirrored.
+
+`WATER_DROP`, `ROCKY_ANGRY`, `TUMBLEWEED`, and `CACTUS` are for when Rocky, the house's black robot vacuum, runs out of water: the last drop flees ahead of an angry Rocky, with the desert he leaves behind. `ROCKY_HAPPY` and `WATER_DROP_HAPPY` are him refilled. Black is an unlit LED, so Rocky is dark gray under a lighter rim. The drops hop one pixel above the road.
 
 Every pass of the animation takes the same amount of time, so longer convoys drive faster.
 
