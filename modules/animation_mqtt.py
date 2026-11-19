@@ -92,6 +92,12 @@ class AnimationListener:
             if reason_code.is_failure:
                 logger.error(f"Animation listener could not connect to the MQTT broker: {reason_code}")
                 return
+            # the broker holds the convoy swap as a retained message, so each connection starts from the configured
+            # convoy and the retained message, if there is one, swaps it back in. A clear published while the
+            # display was offline deleted that message, so nothing else would undo a swap that ended meanwhile
+            submit_departure_convoy = self._submit_by_topic.get(DEPARTURE_CONVOY_TOPIC)
+            if submit_departure_convoy is not None:
+                submit_departure_convoy(b"")
             # on every connect rather than once, so the subscriptions and status survive reconnects
             client.subscribe(self._subscriptions)
             client.publish(STATUS_TOPIC, "online", qos=1, retain=True)

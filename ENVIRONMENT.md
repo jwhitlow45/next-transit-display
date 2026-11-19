@@ -453,7 +453,7 @@ Publish to `transit-display/departure-convoy` with retain, as UTF-8 JSON of at m
 ```
 {"v": 1, "sprites": ["WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"]}
 ```
-`sprites` is 1 to 6 of the valid sprite names listed under DEPARTURE_ANIMATION_SPRITES, leading sprite first. The swap lasts until an empty retained message on the same topic clears it, which puts back the convoy DEPARTURE_ANIMATION_SPRITES configures. Retained matters: the broker keeps the last swap and sends it every time the display connects, so a restart or a reboot keeps it. A request that breaks these rules is dropped and logged at most once a minute, and the current convoy stays.
+`sprites` is 1 to 6 of the valid sprite names listed under DEPARTURE_ANIMATION_SPRITES, leading sprite first. The swap lasts until an empty retained message on the same topic clears it, which puts back the convoy DEPARTURE_ANIMATION_SPRITES configures. Retained matters: the broker keeps the last swap and sends it every time the display connects, so a restart or a reboot keeps it. Each connection starts from the configured convoy before that message arrives, so a clear published while the display was offline still takes effect when it reconnects. A request that breaks these rules is dropped and logged at most once a minute, and the current convoy stays.
 
 Only the sprites change. A departure still fades and tows its own row, and nothing else on the panel is drawn over. From Home Assistant, for example:
 ```

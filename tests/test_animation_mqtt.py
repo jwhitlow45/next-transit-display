@@ -5,6 +5,9 @@ from paho.mqtt.subscribeoptions import SubscribeOptions
 
 import modules.animation_mqtt as animation_mqtt
 from modules.animation_mqtt import ANIMATION_TOPIC, DEPARTURE_CONVOY_TOPIC, STATUS_TOPIC, AnimationListener
+from modules.departure_convoy import DepartureConvoy
+
+_ROCKY = b'{"v": 1, "sprites": ["ROCKY_ANGRY"]}'
 
 
 class _ReasonCode:
@@ -97,6 +100,41 @@ class OnConnectTest(unittest.TestCase):
         )
         self.assertEqual(subscriptions[DEPARTURE_CONVOY_TOPIC].QoS, 1)
         self.assertEqual(subscriptions[ANIMATION_TOPIC].retainHandling, SubscribeOptions.RETAIN_DO_NOT_SEND)
+
+    def test_resets_the_departure_convoy_before_subscribing(self):
+        calls = mock.Mock()
+        listener, _ = _listener(submit_departure_convoy=calls.submit_departure_convoy)
+        listener._on_connect(calls.client, None, None, _ReasonCode(False), None)
+        # cleared first, so the retained message the subscription brings is what decides the convoy
+        self.assertEqual(calls.mock_calls[0], mock.call.submit_departure_convoy(b""))
+        self.assertEqual(calls.mock_calls[1][0], "client.subscribe")
+
+    def test_a_refill_missed_while_offline_ends_the_swap_on_reconnect(self):
+        convoy = DepartureConvoy(("BUS",))
+        listener, _ = _listener(submit_departure_convoy=convoy.submit)
+        listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
+        listener._on_message(None, None, _Message(_ROCKY, DEPARTURE_CONVOY_TOPIC))
+        # the clear was published while the display was offline, deleting the retained swap, so the reconnect
+        # brings no message at all
+        listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
+        self.assertEqual(convoy.sprite_names(), ("BUS",))
+
+    def test_a_swap_still_retained_is_restored_on_reconnect(self):
+        convoy = DepartureConvoy(("BUS",))
+        listener, _ = _listener(submit_departure_convoy=convoy.submit)
+        listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
+        listener._on_message(None, None, _Message(_ROCKY, DEPARTURE_CONVOY_TOPIC))
+        listener._on_connect(mock.Mock(), None, None, _ReasonCode(False), None)
+        listener._on_message(None, None, _Message(_ROCKY, DEPARTURE_CONVOY_TOPIC))
+        self.assertEqual(convoy.sprite_names(), ("ROCKY_ANGRY",))
+
+    def test_a_refused_connect_keeps_the_departure_convoy(self):
+        convoy = DepartureConvoy(("BUS",))
+        convoy.submit(_ROCKY)
+        listener, _ = _listener(submit_departure_convoy=convoy.submit)
+        with self.assertLogs("modules.animation_mqtt", "ERROR"):
+            listener._on_connect(mock.Mock(), None, None, _ReasonCode(True), None)
+        self.assertEqual(convoy.sprite_names(), ("ROCKY_ANGRY",))
 
     def test_a_refused_connect_is_logged_without_subscribing(self):
         listener, _ = _listener()
