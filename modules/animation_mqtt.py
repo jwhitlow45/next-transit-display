@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 # contract version 1 constants, fixed on both sides rather than configured
 ANIMATION_TOPIC = "transit-display/animations/play"
+DEPARTURE_CONVOY_TOPIC = "transit-display/departure-convoy"
 STATUS_TOPIC = "transit-display/status"
 # sent as the MQTT v5 Maximum Packet Size, so the broker never forwards a larger packet to the display and an
 # oversized publish can't exhaust the Pi's memory before the intake's 4 KiB payload check
@@ -26,12 +27,38 @@ _KEEPALIVE_SECONDS = 60
 
 
 class AnimationListener:
-    """Subscribes to the animation topic and hands every payload to submit, on paho's network thread"""
+    """Subscribes to the animation topic, and optionally the departure convoy topic, on paho's network thread
 
-    def __init__(self, host: str, port: int, username: str, password: str, submit: Callable[[bytes], None]):
+    Every payload goes to the callback for its topic: submit for animations, submit_departure_convoy for convoy swaps.
+    """
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        submit: Callable[[bytes], None],
+        submit_departure_convoy: Callable[[bytes], None] | None = None,
+    ):
         self._host = host
         self._port = port
-        self._submit = submit
+        self._submit_by_topic = {ANIMATION_TOPIC: submit}
+        # a retained message on the animation topic is never sent, so a publisher that set retain by mistake can't
+        # replay an old animation every time the display reconnects
+        self._subscriptions = [
+            (ANIMATION_TOPIC, SubscribeOptions(qos=0, retainHandling=SubscribeOptions.RETAIN_DO_NOT_SEND))
+        ]
+        if submit_departure_convoy is not None:
+            self._submit_by_topic[DEPARTURE_CONVOY_TOPIC] = submit_departure_convoy
+            # retained on purpose, unlike animations: the broker keeps the last convoy swap and sends it on every
+            # connect, so a restart or a reboot still drives the swapped convoy. QoS 1 so a swap isn't lost in flight
+            self._subscriptions.append(
+                (
+                    DEPARTURE_CONVOY_TOPIC,
+                    SubscribeOptions(qos=1, retainHandling=SubscribeOptions.RETAIN_SEND_ON_SUBSCRIBE),
+                )
+            )
         # a stable id lets the broker take over the old session when the display reconnects after a hard reset,
         # publishing the dead connection's offline will before the new online rather than 90 s after it. The
         # hostname keeps a test run on another machine from taking over the Pi's session
@@ -65,15 +92,11 @@ class AnimationListener:
             if reason_code.is_failure:
                 logger.error(f"Animation listener could not connect to the MQTT broker: {reason_code}")
                 return
-            # on every connect rather than once, so the subscription and status survive reconnects. A retained
-            # message on the topic is never sent, so a publisher that set retain by mistake can't replay an old
-            # animation every time the display reconnects
-            client.subscribe(
-                ANIMATION_TOPIC,
-                options=SubscribeOptions(qos=0, retainHandling=SubscribeOptions.RETAIN_DO_NOT_SEND),
-            )
+            # on every connect rather than once, so the subscriptions and status survive reconnects
+            client.subscribe(self._subscriptions)
             client.publish(STATUS_TOPIC, "online", qos=1, retain=True)
-            logger.info(f"Animation listener connected to the MQTT broker, listening on {ANIMATION_TOPIC}")
+            topics = ", ".join(topic for topic, _ in self._subscriptions)
+            logger.info(f"Animation listener connected to the MQTT broker, listening on {topics}")
         except Exception:
             logger.error("Animation listener failed handling a connect", exc_info=True)
 
@@ -87,9 +110,10 @@ class AnimationListener:
     def _on_subscribe(self, client, userdata, mid, reason_code_list, properties):
         try:
             # a refused subscription leaves the listener connected but deaf, for example once the broker has ACLs
-            for reason_code in reason_code_list:
+            # one SUBACK answers the whole subscribe, with its reason codes in the order the topics were listed
+            for (topic, _), reason_code in zip(self._subscriptions, reason_code_list):
                 if reason_code.is_failure:
-                    logger.error(f"Animation listener's subscription to {ANIMATION_TOPIC} was refused: {reason_code}")
+                    logger.error(f"Animation listener's subscription to {topic} was refused: {reason_code}")
         except Exception:
             logger.error("Animation listener failed handling a subscription", exc_info=True)
 
@@ -101,6 +125,10 @@ class AnimationListener:
 
     def _on_message(self, client, userdata, message):
         try:
-            self._submit(message.payload)
+            submit = self._submit_by_topic.get(message.topic)
+            if submit is None:
+                logger.debug(f"Animation listener ignored a message on {message.topic!r}")
+                return
+            submit(message.payload)
         except Exception:
             logger.error("Animation listener failed handling a message", exc_info=True)

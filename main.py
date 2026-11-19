@@ -22,6 +22,7 @@ from modules.departure_animation import (
     play_departure_animation,
     play_loading_animation,
 )
+from modules.departure_convoy import DepartureConvoy
 from modules.display_utils import (
     Colors,
     FontAlignment,
@@ -51,6 +52,9 @@ sunrise_sunset_result_lock = threading.Lock()
 # the threads start
 animation_queue: AnimationQueue | None = None
 animation_context: AnimationContext | None = None
+# the convoy departure animations drive, which a publisher can swap. None while the listener is disabled, and then
+# departures always drive the convoy DEPARTURE_ANIMATION_SPRITES configures
+departure_convoy: DepartureConvoy | None = None
 
 # A small arrowhead drawn just left of an arrival time whose bus has left the first stop of its route, pointing the way
 # its row's departure animation drives. It sits inside the space before the time, with a blank column between it and
@@ -77,9 +81,9 @@ _VEHICLE_POSITIONS_MAX_AGE_REFRESHES = 5
 
 
 def main():
-    global animation_queue, animation_context
+    global animation_queue, animation_context, departure_convoy
     if env.ENABLE_ANIMATION_LISTENER == 1:
-        animation_queue, animation_context = start_animation_listener()
+        animation_queue, animation_context, departure_convoy = start_animation_listener()
 
     # daemon threads so the process can exit on Ctrl+C/SIGTERM instead of hanging on the while True loops
     threads = [
@@ -93,7 +97,8 @@ def main():
 
 
 def start_animation_listener():
-    """Starts the MQTT animation listener, returning the queue it fills and the context animations draw with
+    """Starts the MQTT animation listener, returning the queue it fills, the context animations draw with, and the
+    departure convoy publishers can swap
 
     Called from main() before the display and API threads start, so a bad import, a missing paho-mqtt or a missing
     font exits the process for systemd to restart. Raised inside display_loop it would end that thread alone and
@@ -108,14 +113,21 @@ def start_animation_listener():
     context = AnimationContext(font_5x7, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
 
     queue = AnimationQueue()
+    convoy = DepartureConvoy(tuple(env.DEPARTURE_ANIMATION_SPRITE_LIST))
     AnimationListener(
         env.ANIMATION_MQTT_HOST,
         env.ANIMATION_MQTT_PORT,
         env.ANIMATION_MQTT_USERNAME,
         env.ANIMATION_MQTT_PASSWORD,
         AnimationIntake(queue).submit,
+        submit_departure_convoy=convoy.submit,
     ).start()
-    return queue, context
+    return queue, context, convoy
+
+
+def departure_sprite_names():
+    """The convoy for the next departure or loading pass, or None for the configured one"""
+    return departure_convoy.sprite_names() if departure_convoy is not None else None
 
 
 def play_startable_animation(matrix, canvas, animation_context, next_arrival_time: datetime | None, last_animation_end: float | None):
@@ -542,6 +554,7 @@ def play_departure_animation_for_due_arrivals(
         font.height,
         draw_animation_background,
         draw_animation_segments,
+        departure_sprite_names(),
     )
 
 
@@ -583,7 +596,9 @@ def display_loop():
             # loop the departure convoy across the display as a loading screen until stop data arrives
             if display_info_snapshot is None or len(display_info_snapshot) == 0:
                 apply_sun_based_brightness(canvas)
-                canvas = play_loading_animation(matrix, canvas, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS)
+                canvas = play_loading_animation(
+                    matrix, canvas, env.LED_MATRIX_COLS, env.LED_MATRIX_ROWS, departure_sprite_names()
+                )
                 # no arrivals are displayed yet, so no departure can be due
                 canvas, last_animation_end, _ = play_startable_animation(
                     matrix, canvas, animation_context, None, last_animation_end

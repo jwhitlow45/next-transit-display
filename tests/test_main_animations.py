@@ -11,6 +11,7 @@ from unittest import mock
 import main
 from modules.animation_queue import AnimationQueue
 from modules.animation_registry import parse_request
+from modules.departure_convoy import DepartureConvoy
 
 # these waits time out after 5 s, so returning within 4 s proves an early wake while leaving room for a
 # loaded Pi or CI host
@@ -93,10 +94,11 @@ class StartAnimationListenerTest(unittest.TestCase):
         os.chdir(repo_dir)  # the font path is relative to the display's working directory
         try:
             with mock.patch("modules.animation_mqtt.AnimationListener") as listener_class:
-                queue, context = main.start_animation_listener()
+                queue, context, convoy = main.start_animation_listener()
         finally:
             os.chdir(test_dir)
         listener_class.return_value.start.assert_called_once()
+        self.assertEqual(listener_class.call_args.kwargs["submit_departure_convoy"], convoy.submit)
         self.assertIsInstance(queue, AnimationQueue)
         self.assertEqual((context.width, context.height), (64, 32))
         self.assertIsNotNone(context.font_5x7)
@@ -107,6 +109,18 @@ class StartAnimationListenerTest(unittest.TestCase):
             with self.assertRaises(Exception):
                 main.start_animation_listener()
         listener_class.return_value.start.assert_not_called()
+
+
+class DepartureSpriteNamesTest(unittest.TestCase):
+    def test_none_with_the_listener_off_so_departures_drive_the_configured_convoy(self):
+        with mock.patch.object(main, "departure_convoy", None):
+            self.assertIsNone(main.departure_sprite_names())
+
+    def test_the_swapped_convoy_while_the_listener_runs(self):
+        convoy = DepartureConvoy(("BUS",))
+        convoy.submit(b'{"v": 1, "sprites": ["WATER_DROP", "ROCKY_ANGRY"]}')
+        with mock.patch.object(main, "departure_convoy", convoy):
+            self.assertEqual(main.departure_sprite_names(), ("WATER_DROP", "ROCKY_ANGRY"))
 
 
 class ListenerSettingsTest(unittest.TestCase):

@@ -285,6 +285,8 @@ WATER_DROP ROCKY_ANGRY TUMBLEWEED CACTUS ROCKY_HAPPY WATER_DROP_HAPPY
 ```
 Names are case sensitive. Spaces around them are ignored. An unknown name stops the display at startup with an error listing the valid names.
 
+With the animation listener on, a publisher can swap this convoy for another while the display runs, see [Swapping the departure convoy](#swapping-the-departure-convoy).
+
 `GHOST_BUS`, `PUMPKIN_COACH`, `HEARSE`, and `BAT` are Halloween themed. The bat flies above the road line rather than driving along it.
 
 `CHICKEN_JOCKEY`, `PIG`, `COW`, and `CREEPER` are Minecraft themed. The creeper faces you, since its face is what makes it a creeper.
@@ -445,6 +447,24 @@ Every animation takes over the whole panel, then the transit view comes back. A 
 Animations wait their turn: at most 3 wait at once (a fourth drops the oldest), an identical request already waiting is ignored, and a request that hasn't started within 15 seconds is dropped. One never starts if it would still be playing when the next displayed arrival begins its departure pulse, so departures keep their animation, except when a data refresh moves an arrival earlier while an animation plays. It waits until after the departure instead, or expires.
 
 `flash` fills the whole panel, so its colors are dimmed until their brightest channel is at most 60 to protect the power supply the panel shares with the Pi. It changes color at most twice a second.
+
+#### Swapping the departure convoy
+Publish to `transit-display/departure-convoy` with retain, as UTF-8 JSON of at most 4 KiB, to change which sprites the departure animations and the loading screen drive:
+```
+{"v": 1, "sprites": ["WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"]}
+```
+`sprites` is 1 to 6 of the valid sprite names listed under DEPARTURE_ANIMATION_SPRITES, leading sprite first. The swap lasts until an empty retained message on the same topic clears it, which puts back the convoy DEPARTURE_ANIMATION_SPRITES configures. Retained matters: the broker keeps the last swap and sends it every time the display connects, so a restart or a reboot keeps it. A request that breaks these rules is dropped and logged at most once a minute, and the current convoy stays.
+
+Only the sprites change. A departure still fades and tows its own row, and nothing else on the panel is drawn over. From Home Assistant, for example:
+```
+action: mqtt.publish
+data:
+  topic: transit-display/departure-convoy
+  payload: '{"v": 1, "sprites": ["WATER_DROP", "ROCKY_ANGRY", "TUMBLEWEED", "CACTUS"]}'
+  qos: 1
+  retain: true
+```
+and the same with `payload: ""` to clear it.
 
 The display publishes `online` to `transit-display/status` (retained) when it connects, and the broker publishes `offline` there when the display goes away.
 

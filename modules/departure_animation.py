@@ -95,7 +95,7 @@ def draw_convoy_pass_frame(canvas, sprite_names: tuple[str, ...], direction: Ani
     )
 
 
-def play_loading_animation(matrix, canvas, display_width: int, display_height: int):
+def play_loading_animation(matrix, canvas, display_width: int, display_height: int, sprite_names: tuple[str, ...] | None = None):
     """Plays one pass of the transit convoy driving across the vertical center of the display
 
     Intended to be looped as a loading screen while waiting for the first stop data to arrive
@@ -105,6 +105,8 @@ def play_loading_animation(matrix, canvas, display_width: int, display_height: i
         canvas: back buffer canvas to draw the next frame on
         display_width (int): width of the display in pixels
         display_height (int): height of the display in pixels
+        sprite_names (tuple[str, ...] | None): the convoy to drive, leading sprite first, or None for the one
+            DEPARTURE_ANIMATION_SPRITES configures
 
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
@@ -114,7 +116,7 @@ def play_loading_animation(matrix, canvas, display_width: int, display_height: i
         canvas,
         lambda animation_canvas, elapsed_seconds: draw_convoy_pass_frame(
             animation_canvas,
-            _DEPARTURE_SPRITE_NAMES,
+            sprite_names or _DEPARTURE_SPRITE_NAMES,
             AnimationDirection.LEFT_TO_RIGHT,
             display_width,
             display_height,
@@ -123,7 +125,7 @@ def play_loading_animation(matrix, canvas, display_width: int, display_height: i
     )
 
 
-def play_departure_animation(matrix, canvas, display_width: int, animation_row_list: list[DepartureAnimationRow], row_height: int, draw_background, draw_segments):
+def play_departure_animation(matrix, canvas, display_width: int, animation_row_list: list[DepartureAnimationRow], row_height: int, draw_background, draw_segments, sprite_names: tuple[str, ...] | None = None):
     """Plays an animation of convoys of transit vehicles driving through display rows
 
     Intended to play when displayed arrival times reach 0. Each row's current contents fade out, then a
@@ -140,6 +142,8 @@ def play_departure_animation(matrix, canvas, display_width: int, animation_row_l
         draw_background: callable which draws the non-animated display contents onto the canvas passed to it
         draw_segments: callable which draws (canvas, segments, brightness_percent, x_offset), used to
             fade out each row's current contents and to draw its towed contents mid-tow
+        sprite_names (tuple[str, ...] | None): the convoy to drive, leading sprite first, or None for the one
+            DEPARTURE_ANIMATION_SPRITES configures
 
     Returns:
         canvas: back buffer canvas returned by the final frame swap, use this in place of the canvas passed in
@@ -155,7 +159,7 @@ def play_departure_animation(matrix, canvas, display_width: int, animation_row_l
             row_height,
             draw_background,
             draw_segments,
-            _DEPARTURE_SPRITE_NAMES,
+            sprite_names or _DEPARTURE_SPRITE_NAMES,
         ),
     )
 
