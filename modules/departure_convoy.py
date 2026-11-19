@@ -1,8 +1,8 @@
 """The departure convoy a publisher can swap in, such as a themed one while something in the house needs attention
 
-Like the animation intake it is transport-agnostic: the MQTT listener only hands it each payload. The swap lasts
-until a publisher clears it or the display restarts, and the listener's retained subscription restores it on
-every connect, so a reboot keeps whatever convoy was last swapped in.
+Like the animation intake it is transport-agnostic: the MQTT listener only hands it each payload. The listener
+clears the swap on every connect and its retained subscription restores it, so a reboot keeps the last swap and a
+clear published while the display was offline still ends it.
 """
 
 import logging
