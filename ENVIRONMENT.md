@@ -448,6 +448,8 @@ Animations wait their turn: at most 3 wait at once (a fourth drops the oldest), 
 
 `flash` fills the whole panel, so its colors are dimmed until their brightest channel is at most 60 to protect the power supply the panel shares with the Pi. It changes color at most twice a second.
 
+The display publishes `online` to `transit-display/status` (retained) when it connects, and the broker publishes `offline` there when the display goes away.
+
 #### Swapping the departure convoy
 Publish to `transit-display/departure-convoy` with retain, as UTF-8 JSON of at most 4 KiB, to change which sprites the departure animations and the loading screen drive:
 ```
@@ -465,8 +467,6 @@ data:
   retain: true
 ```
 and the same with `payload: ""` to clear it.
-
-The display publishes `online` to `transit-display/status` (retained) when it connects, and the broker publishes `offline` there when the display goes away.
 
 ### Development
 #### LOG_LEVEL
