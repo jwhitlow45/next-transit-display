@@ -12,7 +12,7 @@ from httpx import HTTPStatusError
 
 import modules.environment as env
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
-from models.OpenData511 import TransitVehiclePositionsResponse
+from models.OpenData511 import StartingStop, TransitVehiclePositionsResponse
 from models.SunriseSunset import SunriseSunsetResult
 from modules.animation_player import MIN_GAP_SECONDS, AnimationContext, can_start, play_animation
 from modules.animation_queue import AnimationQueue
@@ -692,19 +692,19 @@ def display_loop():
 def fetch_display_info_dict(
     client: OpenData511Client,
     vehicle_stop_sequence_dict: dict[str, int] | None = None,
-    starting_stop_sequence_dict: dict[str, int] | None = None,
+    starting_stop_dict: dict[str, StartingStop] | None = None,
 ) -> dict[str, DisplayInfoModel]:
     """Fetches every stop's upcoming visits from the agency's trip updates, returning an empty dict on request
     failure so the previously fetched data stays displayed
 
-    starting_stop_sequence_dict carries each trip's starting stop from one refresh to the next, and is updated in place
+    starting_stop_dict carries each trip's starting stop from one refresh to the next, and is updated in place
     """
     try:
         trip_updates = client.get_transit_trip_updates(env.OPEN_DATA_511_AGENCY_ID)
-        if starting_stop_sequence_dict is not None:
-            trip_updates.remember_starting_stop_sequences(starting_stop_sequence_dict)
+        if starting_stop_dict is not None:
+            trip_updates.remember_starting_stops(starting_stop_dict)
         return trip_updates.convert_to_display_info_dict(
-            env.OPEN_DATA_511_STOPCODE_LIST, vehicle_stop_sequence_dict, starting_stop_sequence_dict
+            env.OPEN_DATA_511_STOPCODE_LIST, vehicle_stop_sequence_dict, starting_stop_dict
         )
     except HTTPStatusError as err:
         # fail program on 401; an unhandled raise would only kill this thread and leave the display
@@ -782,7 +782,7 @@ def api_loop():
     client_cycle = itertools.cycle(client_list)
 
     vehicle_positions: TransitVehiclePositionsResponse | None = None
-    starting_stop_sequence_dict: dict[str, int] = {}
+    starting_stop_dict: dict[str, StartingStop] = {}
     refresh_count = 0
 
     sunrise_sunset_client: SunriseSunsetClient | None = None
@@ -798,7 +798,7 @@ def api_loop():
 
         # one trip updates request covers every stopcode
         display_info_dict_staged = fetch_display_info_dict(
-            next(client_cycle), get_fresh_vehicle_stop_sequence_dict(vehicle_positions), starting_stop_sequence_dict
+            next(client_cycle), get_fresh_vehicle_stop_sequence_dict(vehicle_positions), starting_stop_dict
         )
 
         with display_info_lock:

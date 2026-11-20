@@ -9,7 +9,7 @@ from google.transit import gtfs_realtime_pb2
 
 import main
 from models.DisplayInfo import DisplayInfoModel, StopVisitModel
-from models.OpenData511 import TransitTripUpdatesResponse, TransitVehiclePositionsResponse
+from models.OpenData511 import StartingStop, TransitTripUpdatesResponse, TransitVehiclePositionsResponse
 
 _FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "5x7.bdf")
 _NOW = datetime(2026, 11, 9, 18, 0, tzinfo=timezone.utc)
@@ -125,11 +125,12 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         self.assertTrue(self._en_route(trip, {"0": 2}))
 
     def test_a_trip_holding_at_its_second_stop_sets_off_from_there(self):
+        # the feed still lists stop 1, long after the bus pulled in to hold at stop 2
         leaves = _NOW + timedelta(minutes=1)
         trip = [
-            (1, "terminal", None, leaves),
-            (2, "hold", None, leaves + timedelta(minutes=20)),
-            (5, _STOP, leaves + timedelta(minutes=25), None),
+            (1, "terminal", None, leaves - timedelta(minutes=20)),
+            (2, "hold", None, leaves),
+            (5, _STOP, leaves + timedelta(minutes=5), None),
         ]
         self.assertFalse(self._en_route(trip, {"0": 2}))
         self.assertTrue(self._en_route(trip, {"0": 3}))
@@ -138,6 +139,50 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         soon = _NOW + timedelta(minutes=1)
         trip = [(3, "next", soon, soon), (6, _STOP, soon + timedelta(minutes=3), None)]
         self.assertTrue(self._en_route(trip, {"another trip": 1}))
+
+
+class NotYetLeftTest(unittest.TestCase):
+    """Either feed can show a bus that hasn't left the start of its route as gone, and such a trip stays unmarked"""
+
+    def _en_route(self, stop_time_updates, vehicle_stop_sequences=None, earlier_stop_time_updates=None):
+        starting_stop_dict: dict[str, StartingStop] = {}
+        if earlier_stop_time_updates is not None:
+            _feed(("48", earlier_stop_time_updates)).remember_starting_stops(starting_stop_dict)
+        feed = _feed(("48", stop_time_updates))
+        feed.remember_starting_stops(starting_stop_dict)
+        stop_visits = feed.convert_to_display_info_dict([_STOP], vehicle_stop_sequences, starting_stop_dict)[
+            _STOP
+        ].stop_visit_list
+        return stop_visits[0].en_route
+
+    def _waiting_at_the_terminal(self, leaves):
+        # the trip updates feed drops the stop a bus stands at, so a bus waiting to leave lists its second stop next
+        listed = [(1, "terminal", None, leaves), (6, _STOP, leaves + timedelta(minutes=6), None)]
+        dropped = [(2, "second", leaves + timedelta(minutes=1), None), (6, _STOP, leaves + timedelta(minutes=6), None)]
+        return listed, dropped
+
+    def test_a_bus_waiting_at_its_first_stop_is_not_en_route_until_shortly_before_it_is_due_to_leave(self):
+        listed, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=6))
+        self.assertFalse(self._en_route(dropped, earlier_stop_time_updates=listed))
+        listed, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=1))
+        self.assertTrue(self._en_route(dropped, earlier_stop_time_updates=listed))
+
+    def test_a_vehicle_past_its_first_stop_is_not_en_route_while_the_feed_expects_it_to_leave_later(self):
+        leaves = _NOW + timedelta(minutes=6)
+        trip = [(1, "terminal", None, leaves), (6, _STOP, leaves + timedelta(minutes=6), None)]
+        self.assertFalse(self._en_route(trip, {"0": 30}))
+
+    def test_a_trip_whose_next_stop_is_far_off_is_not_en_route(self):
+        # after a restart nothing is remembered, so a bus waiting at its first stop is caught by its next stop's time
+        _, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=14))
+        self.assertFalse(self._en_route(dropped))
+        self.assertFalse(self._en_route(dropped, {"0": 2}))
+
+    def test_a_bus_on_a_long_stretch_between_stops_stays_en_route(self):
+        next_stop = _NOW + timedelta(minutes=8)
+        trip = [(14, "across the bridge", next_stop, None), (20, _STOP, next_stop + timedelta(minutes=6), None)]
+        self.assertTrue(self._en_route(trip))
+        self.assertTrue(self._en_route(trip, {"0": 14}))
 
 
 class RememberedStartingStopTest(unittest.TestCase):
@@ -154,15 +199,15 @@ class RememberedStartingStopTest(unittest.TestCase):
     _AFTER = [(3, "next", _LEAVES, _LEAVES), (5, _STOP, _LEAVES + timedelta(minutes=5), None)]
 
     def _en_route_after_dropping_the_starting_stop(self, vehicle_stop_sequence, seen_before):
-        starting_stop_sequence_dict: dict[str, int] = {}
+        starting_stop_dict: dict[str, StartingStop] = {}
         if seen_before:
             for trip in (self._FIRST, self._SECOND):
-                _feed(("9", trip)).remember_starting_stop_sequences(starting_stop_sequence_dict)
+                _feed(("9", trip)).remember_starting_stops(starting_stop_dict)
         after = _feed(("9", self._AFTER))
-        after.remember_starting_stop_sequences(starting_stop_sequence_dict)
-        stop_visits = after.convert_to_display_info_dict(
-            [_STOP], {"0": vehicle_stop_sequence}, starting_stop_sequence_dict
-        )[_STOP].stop_visit_list
+        after.remember_starting_stops(starting_stop_dict)
+        stop_visits = after.convert_to_display_info_dict([_STOP], {"0": vehicle_stop_sequence}, starting_stop_dict)[
+            _STOP
+        ].stop_visit_list
         return stop_visits[0].en_route
 
     def test_a_bus_still_holding_at_stop_2_is_not_en_route(self):
@@ -173,9 +218,9 @@ class RememberedStartingStopTest(unittest.TestCase):
         self.assertTrue(self._en_route_after_dropping_the_starting_stop(2, seen_before=False))
 
     def test_the_latest_starting_stop_is_kept_and_trips_that_leave_the_feed_are_forgotten(self):
-        starting_stop_sequence_dict = {"gone": 1}
-        _feed(("9", self._FIRST)).remember_starting_stop_sequences(starting_stop_sequence_dict)
-        self.assertEqual(starting_stop_sequence_dict, {"0": 2})
+        starting_stop_dict = {"gone": StartingStop(1, _NOW)}
+        _feed(("9", self._FIRST)).remember_starting_stops(starting_stop_dict)
+        self.assertEqual(starting_stop_dict, {"0": StartingStop(2, self._LEAVES)})
 
 
 class VehiclePositionsTest(unittest.TestCase):
@@ -240,11 +285,11 @@ class ApiLoopRequestsTest(unittest.TestCase):
         vehicle_dicts = []
 
         class FakeTripUpdates:
-            def remember_starting_stop_sequences(self, starting_stop_sequence_dict):
+            def remember_starting_stops(self, starting_stop_dict):
                 pass
 
             def convert_to_display_info_dict(
-                self, stopcode_list, vehicle_stop_sequence_dict=None, starting_stop_sequence_dict=None
+                self, stopcode_list, vehicle_stop_sequence_dict=None, starting_stop_dict=None
             ):
                 vehicle_dicts.append(vehicle_stop_sequence_dict)
                 return {}
