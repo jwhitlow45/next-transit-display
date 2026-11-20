@@ -125,12 +125,11 @@ class EnRouteFromVehicleTest(unittest.TestCase):
         self.assertTrue(self._en_route(trip, {"0": 2}))
 
     def test_a_trip_holding_at_its_second_stop_sets_off_from_there(self):
-        # the feed still lists stop 1, long after the bus pulled in to hold at stop 2
         leaves = _NOW + timedelta(minutes=1)
         trip = [
-            (1, "terminal", None, leaves - timedelta(minutes=20)),
-            (2, "hold", None, leaves),
-            (5, _STOP, leaves + timedelta(minutes=5), None),
+            (1, "terminal", None, leaves),
+            (2, "hold", None, leaves + timedelta(minutes=20)),
+            (5, _STOP, leaves + timedelta(minutes=25), None),
         ]
         self.assertFalse(self._en_route(trip, {"0": 2}))
         self.assertTrue(self._en_route(trip, {"0": 3}))
@@ -142,7 +141,8 @@ class EnRouteFromVehicleTest(unittest.TestCase):
 
 
 class NotYetLeftTest(unittest.TestCase):
-    """Either feed can show a bus that hasn't left the start of its route as gone, and such a trip stays unmarked"""
+    """Without a vehicle position, the trip updates feed shows a bus waiting at the start of its route as gone, so such
+    a trip stays unmarked until its times agree it has left. A vehicle position still decides on its own"""
 
     def _en_route(self, stop_time_updates, vehicle_stop_sequences=None, earlier_stop_time_updates=None):
         starting_stop_dict: dict[str, StartingStop] = {}
@@ -167,19 +167,21 @@ class NotYetLeftTest(unittest.TestCase):
         listed, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=1))
         self.assertTrue(self._en_route(dropped, earlier_stop_time_updates=listed))
 
-    def test_a_vehicle_past_its_first_stop_is_not_en_route_while_the_feed_expects_it_to_leave_later(self):
-        leaves = _NOW + timedelta(minutes=6)
-        trip = [(1, "terminal", None, leaves), (6, _STOP, leaves + timedelta(minutes=6), None)]
-        self.assertFalse(self._en_route(trip, {"0": 30}))
+    def test_a_vehicle_position_decides_even_when_the_feed_expects_the_bus_to_leave_later(self):
+        listed, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=6))
+        self.assertFalse(self._en_route(dropped, {"0": 1}, earlier_stop_time_updates=listed))
+        self.assertTrue(self._en_route(dropped, {"0": 2}, earlier_stop_time_updates=listed))
+        self.assertTrue(self._en_route(listed, {"0": 2}))
 
-    def test_a_trip_whose_next_stop_is_far_off_is_not_en_route(self):
-        # after a restart nothing is remembered, so a bus waiting at its first stop is caught by its next stop's time
+    def test_after_a_restart_a_bus_waiting_at_its_first_stop_is_told_apart_by_its_next_stop(self):
+        # nothing is remembered after a restart, so the far-off next stop is what shows the bus hasn't left
         _, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=14))
         self.assertFalse(self._en_route(dropped))
-        self.assertFalse(self._en_route(dropped, {"0": 2}))
+        _, dropped = self._waiting_at_the_terminal(_NOW + timedelta(minutes=8))
+        self.assertTrue(self._en_route(dropped))
 
-    def test_a_bus_on_a_long_stretch_between_stops_stays_en_route(self):
-        next_stop = _NOW + timedelta(minutes=8)
+    def test_a_bus_far_from_its_next_stop_mid_route_stays_en_route(self):
+        next_stop = _NOW + timedelta(minutes=12)
         trip = [(14, "across the bridge", next_stop, None), (20, _STOP, next_stop + timedelta(minutes=6), None)]
         self.assertTrue(self._en_route(trip))
         self.assertTrue(self._en_route(trip, {"0": 14}))

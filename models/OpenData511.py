@@ -8,9 +8,13 @@ import models.DisplayInfo as DisplayInfoModels
 # how long before the trip updates feed expects it a bus can set off from the start of its route. Buses rarely leave
 # early, and the feed's departure time can trail a bus that has just left by a refresh or two
 _EARLIEST_DEPARTURE_LEAD = timedelta(minutes=2)
-# how far a moving bus can be from the next stop its trip lists. The longest stretches between stops, such as route
-# 25 crossing the Bay Bridge, take about 8 minutes
+# how far a bus that has just left the start of its route can be from the next stop it lists. Stops near the start of
+# a route are close together, and the longest stretch between any two stops, route 25 crossing the Bay Bridge, takes
+# about 8 minutes
 _LONGEST_TIME_TO_NEXT_STOP = timedelta(minutes=10)
+# the furthest stop a bus waiting at the start of its route lists next: stop 2, or stop 3 for the route 9 trips that
+# hold at stop 2
+_LAST_STOP_LISTED_WHILE_WAITING = 3
 
 
 class StartingStop(NamedTuple):
@@ -56,28 +60,21 @@ def is_en_route(
     The vehicle's own position decides when the vehicle positions feed has one for the trip. The trip updates feed
     drops the stop a bus is standing at, so a late bus still boarding at its first stop already looks gone there, and
     it can also lag a bus that has just left. Without a vehicle, the trip updates feed is all there is: a trip that
-    hasn't started lists its first stop with only a departure time, and drops that stop once the bus pulls away
+    hasn't started lists its first stop with only a departure time, and drops that stop once the bus pulls away. As it
+    also drops that stop while the bus waits there, its times have to agree the bus has left, see _could_have_left
 
-    remembered_starting_stop is the trip's starting stop from an earlier refresh, see
-    TransitTripUpdatesResponse.remember_starting_stops
+    now is the trip updates feed's own time. remembered_starting_stop is the trip's starting stop from an earlier
+    refresh, see TransitTripUpdatesResponse.remember_starting_stops
     """
     if len(stop_time_update_list) == 0:
         return False
     first_listed = stop_time_update_list[0]
     starting_stop = get_starting_stop(stop_time_update_list) or remembered_starting_stop
-    # Either feed can show a bus waiting at the start of its route as gone, such as when the trip updates feed drops
-    # the stop the bus stands at and the vehicle positions feed has no position for it. A bus that has really left
-    # set off no earlier than shortly before the feed expected, and is near the next stop its trip lists, so a trip
-    # failing either check hasn't left whatever the feeds say. A restart forgets the starting stops the feed has
-    # dropped, and the next stop check still covers those trips
-    if starting_stop is not None and starting_stop.departure_time - now > _EARLIEST_DEPARTURE_LEAD:
-        return False
-    first_listed_time = _listed_time(first_listed)
-    if first_listed_time is not None and first_listed_time - now > _LONGEST_TIME_TO_NEXT_STOP:
-        return False
+    if vehicle_stop_sequence is None:
+        return first_listed.arrival.HasField("time") and _could_have_left(first_listed, starting_stop, now)
     # As a bus nears the last stop of its trip, the vehicle positions feed numbers that stop 1, most likely as the
     # first stop of the bus's next trip. So a trip down to its last stop is en route whatever the vehicle says
-    if vehicle_stop_sequence is None or len(stop_time_update_list) == 1:
+    if len(stop_time_update_list) == 1:
         return first_listed.arrival.HasField("time")
     # A trip without a starting stop was first seen after it dropped it, which only happens to trips already running
     # when the display starts. It is taken to set off from stop 1, as the agency's trips do apart from the route 9
@@ -85,6 +82,21 @@ def is_en_route(
     # before the first listed one instead would blink the marker off at every stop such a bus makes
     starting_stop_sequence = starting_stop.stop_sequence if starting_stop is not None else 1
     return vehicle_stop_sequence > starting_stop_sequence
+
+
+def _could_have_left(first_listed, starting_stop: StartingStop | None, now: datetime):
+    """Whether the trip updates feed's times allow that a trip with no vehicle position has left the start of its route
+
+    A bus that has left set off no earlier than shortly before the feed expected it to. A restart forgets the starting
+    stops the feed had already dropped, so a bus waiting at the start of its route is also told apart by how far off
+    the next stop it lists is
+    """
+    if starting_stop is not None and starting_stop.departure_time - now > _EARLIEST_DEPARTURE_LEAD:
+        return False
+    if first_listed.stop_sequence > _LAST_STOP_LISTED_WHILE_WAITING:
+        return True
+    first_listed_time = _listed_time(first_listed)
+    return first_listed_time is None or first_listed_time - now <= _LONGEST_TIME_TO_NEXT_STOP
 
 
 class TransitVehiclePositionsResponse:
