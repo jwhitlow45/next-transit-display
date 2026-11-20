@@ -8,9 +8,9 @@ import models.DisplayInfo as DisplayInfoModels
 # how long before the trip updates feed expects it a bus can set off from the start of its route. Buses rarely leave
 # early, and the feed's departure time can trail a bus that has just left by a refresh or two
 _EARLIEST_DEPARTURE_LEAD = timedelta(minutes=2)
-# how far a bus that has just left the start of its route can be from the next stop it lists. Stops near the start of
-# a route are close together, and the longest stretch between any two stops, route 25 crossing the Bay Bridge, takes
-# about 8 minutes
+# how far a bus that has just left the start of its route can be from the next stop it lists. Routes reach their second
+# stop within 5 minutes, apart from route 25, whose first stretch crosses the Bay Bridge in about 12. A route 25 bus
+# without a vehicle position gets its marker a few minutes late there, rather than raising the limit for every route
 _LONGEST_TIME_TO_NEXT_STOP = timedelta(minutes=10)
 # the furthest stop a bus waiting at the start of its route lists next: stop 2, or stop 3 for the route 9 trips that
 # hold at stop 2
